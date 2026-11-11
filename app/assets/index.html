@@ -39,6 +39,7 @@ select{flex:1;min-width:0;min-height:44px;font:inherit;color:var(--fg);backgroun
 input[type=range]{width:100%;accent-color:var(--play);height:28px}
 input[type=text]{flex:1;min-width:0;min-height:40px;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 8px}
 .danger{color:var(--rec)}
+.ana{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:4px;padding:8px;background:var(--panel)}.ana canvas{display:block;width:100%;height:120px;background:var(--bg);border-radius:4px}.ana .v{font-size:15px}.ana .flag{font-weight:600}.ana .tip{font-size:12px}
 #empty{color:var(--dim);padding:14px 0}
 #note{padding:0 16px 10px;color:var(--dim);font-size:12px}
 [hidden]{display:none!important}
@@ -62,7 +63,7 @@ input[type=text]{flex:1;min-width:0;min-height:40px;font:inherit;color:var(--fg)
       <label for="mic">Microphone<select id="mic"></select></label>
       <div class="tip">After REC you have 3 seconds to get in position; a buzz marks the start and a double buzz the end. Phone speakers can't play sounds this low, so use headphones. Filter, noise reduction and hum filter apply to the graph, playback and filtered exports. The saved recording is always the raw microphone signal.</div>
     </div>
-    <div class="tip" id="how">Press the phone's bottom edge (microphone) onto bare skin on the breastbone. Hold still. Listen with headphones.</div>
+    <div class="tip" id="how">Press the phone's bottom edge (microphone) onto bare skin just left of the breastbone, between the ribs. Hold still. Listen with headphones.</div>
   </div>
   <div id="msg" role="status"></div>
   <div id="bar"><span id="count"></span></div>
@@ -152,6 +153,7 @@ function row(r, st) {
   const btn = (t, f, c) => { const b = document.createElement("button"); b.textContent = t; if (c) b.className = c; b.addEventListener("click", f); return b; };
   const playing = st.play === r.name;
   a.append(btn(playing ? "STOP" : "PLAY", () => { playing ? A.stopPlay() : A.play(r.name); }, "pl"));
+  a.append(btn(anaWait === r.name ? "ANALYSING…" : "ANALYSE", () => { if (ana[r.name]) { delete ana[r.name]; render(); } else if (!anaWait) { anaWait = r.name; A.analyse(r.name); render(); } }));
   a.append(btn("MORE", () => { open = open === r.name ? null : r.name; confirmDel = null; renaming = null; render(); }));
   d.append(a);
   if (playing) {
@@ -161,6 +163,7 @@ function row(r, st) {
     const t = document.createElement("div"); t.className = "m"; t.id = "pt"; t.textContent = fmt(st.pos) + " / " + fmt(st.dur);
     d.append(s, t);
   }
+  if (ana[r.name]) d.append(anaPanel(ana[r.name]));
   if (open === r.name) {
     const x = document.createElement("div"); x.className = "a";
     x.append(btn("SHARE", () => A.share(r.name)), btn("SAVE RAW WAV", () => A.saveRaw(r.name)), btn("SAVE FILTERED WAV", () => A.saveFiltered(r.name)), btn("SAVE GRAPH CSV", () => A.saveCsv(r.name)), btn("RENAME", () => { renaming = r.name; render(); }), btn("DELETE", () => { confirmDel = r.name; render(); }, "danger"));
@@ -178,6 +181,38 @@ function row(r, st) {
     }
   }
   return d;
+}
+// Analysis panel: typical beat, rate, timing and the experimental murmur-like-sound flag.
+let ana = {}, anaWait = null;
+function anaPanel(a) {
+  const p = document.createElement("div"); p.className = "ana";
+  const line = (t, c) => { const e = document.createElement("div"); e.className = c || "v"; e.textContent = t; p.append(e); return e; };
+  if (!a.avg || !a.avg.length) { line("Unable to estimate reliably: " + (a.why || "no beats found") + ".", "v"); line("Try again: bare skin, just left of the breastbone between the ribs, hold still, quiet room.", "tip"); return p; }
+  const c = document.createElement("canvas"); c.setAttribute("aria-label", "Typical beat"); p.append(c);
+  requestAnimationFrame(() => drawBeat(c, a));
+  line("Typical beat from " + a.beats + " beats. Line: middle value. Band: middle half of beats.", "tip");
+  if (a.reliable) {
+    line("Heart rate: " + Math.round(a.rate) + " per minute");
+    line("First to second heart sound: " + a.s1s2.toFixed(2) + " s · beat length varies ±" + Math.round(a.spread * 50) + "%");
+  } else line("Heart rate: unable to estimate reliably (" + a.why + ").");
+  const f = line(a.flag === 1 ? "Flagged: extra sound between the two heart sounds" : a.flag === 0 ? "Not flagged: no extra sound between the two heart sounds" : "Murmur-like sound: cannot tell from this recording", "v flag");
+  f.style.color = a.flag === 1 ? "var(--amber)" : "var(--fg)";
+  if (a.sysDb !== null) line("Sound between the first and second heart sound is " + (a.sysDb >= 0 ? "+" : "") + a.sysDb.toFixed(1) + " dB against the quiet gap after the second; above the +3 dB limit in " + Math.round(a.sysShare * 100) + "% of beats.", "tip");
+  line(a.flag === 1 ? "This can be a murmur. It can also be breathing, rubbing or room noise, and many murmurs are harmless. Only a doctor listening with a stethoscope can tell. Record again to see if it repeats."
+    : "Experimental and tested only on stethoscope recordings of children, not on phones. There it missed about 4 in 10 murmurs. It cannot name or rule out any heart disease. If you have symptoms or concerns, see a doctor whatever this says.", "tip");
+  return p;
+}
+function drawBeat(c, a) {
+  const r = window.devicePixelRatio || 1, W = Math.round(c.clientWidth * r), H = Math.round(c.clientHeight * r); c.width = W; c.height = H;
+  const g = c.getContext("2d"), cs = getComputedStyle(document.documentElement), n = a.avg.length, top = Math.max(...a.hi, 1e-6) * 1.1, base = H - 16 * r;
+  const X = i => i / (n - 1) * W, Y = v => base - Math.min(1, v / top) * (base - 4 * r), T = t => (t + a.pre) / a.step / (n - 1) * W;
+  g.strokeStyle = cs.getPropertyValue("--line"); g.lineWidth = 1; g.beginPath();
+  for (let t = -0.1; t < n * a.step - a.pre; t += 0.1) { const x = Math.round(T(t)) + 0.5; g.moveTo(x, 0); g.lineTo(x, base); } g.moveTo(0, base + 0.5); g.lineTo(W, base + 0.5); g.stroke();
+  g.fillStyle = "rgba(124,200,164,.3)"; g.beginPath(); for (let i = 0; i < n; i++) g.lineTo(X(i), Y(a.hi[i])); for (let i = n - 1; i >= 0; i--) g.lineTo(X(i), Y(a.lo[i])); g.fill();
+  g.strokeStyle = cs.getPropertyValue("--play"); g.lineWidth = 2 * r; g.lineJoin = "round"; g.beginPath(); for (let i = 0; i < n; i++) i ? g.lineTo(X(i), Y(a.avg[i])) : g.moveTo(X(i), Y(a.avg[i])); g.stroke();
+  g.fillStyle = cs.getPropertyValue("--dim"); g.font = 11 * r + "px sans-serif"; g.textAlign = "center";
+  g.fillText("S1", T(0), H - 3 * r); if (a.s1s2) g.fillText("S2", T(a.s1s2), H - 3 * r); if (a.cycle) g.fillText("S1", T(a.cycle), H - 3 * r);
+  g.textAlign = "left"; g.fillText("0.1 s per line", 4 * r, 12 * r);
 }
 function render() {
   const l = $("list"); l.textContent = "";
@@ -203,6 +238,7 @@ function tick() {
   if (was.rec !== s.rec) A.keepOn(s.rec);
   if (was.rec !== s.rec || was.play !== s.play) { last = s; refresh(); }
   was = s; last = s;
+  if (anaWait) { const j = JSON.parse(A.analysis()); if (j) { if (j.a) ana[j.name] = j.a; anaWait = null; render(); } }
   if (pull()) draw();
   const sk = $("seek");
   if (sk && !sk.matches(":active") && s.dur) sk.value = s.pos / s.dur * 1000;

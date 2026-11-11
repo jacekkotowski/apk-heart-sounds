@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
     private volatile boolean playStop, busy;
     private volatile String playName, notice;
     private volatile double playPos, playDur, seekTo = -1;
+    private volatile String analysis;
 
     static String micName(AudioDeviceInfo d) {
         int t = d.getType(); String kind;
@@ -262,6 +263,18 @@ public class MainActivity extends Activity {
             final Cfg c = cfg; if (c.raw()) { notice = "Choose Heart sounds or Wide first. Raw is saved with SAVE RAW WAV."; return; }
             export(name.replaceAll("\\.wav$", "") + "_" + c.tag() + ".wav", "audio/wav", tmp -> Render.wav(named(name), tmp, c));
         }
+        /** Finds the beats in a recording and measures them. The result is read with analysis(). */
+        @JavascriptInterface public void analyse(String name) {
+            new Thread(() -> {
+                try {
+                    busy = true; int[] fs = {0};
+                    float[] x = Render.signal(named(name), new Cfg(0, 0, 0, 1), fs); // unfiltered, reduced to about 4 kHz; the analysis applies its own filters
+                    analysis = "{\"name\":" + jq(name) + ",\"a\":" + Analysis.run(x, fs[0]).json() + "}";
+                } catch (Exception e) { notice = "Can't analyse: " + e.getMessage(); analysis = "{\"name\":" + jq(name) + ",\"a\":null}"; }
+                finally { busy = false; }
+            }, "analyse").start();
+        }
+        @JavascriptInterface public String analysis() { String a = analysis; analysis = null; return a == null ? "null" : a; }
         @JavascriptInterface public void saveCsv(String name) {
             final Cfg c = cfg; if (c.raw()) { notice = "Choose Heart sounds or Wide first. The CSV holds the filtered signal."; return; }
             export(name.replaceAll("\\.wav$", "") + "_" + c.tag() + ".csv", "text/csv", tmp -> Render.csv(named(name), tmp, c));

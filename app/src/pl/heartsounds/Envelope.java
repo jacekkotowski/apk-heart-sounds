@@ -6,6 +6,7 @@ package pl.heartsounds;
  */
 final class Envelope {
     private final Biquad[] lp;
-    Envelope(double fs) { lp = Biquad.butter(false, 4, fs, 15); }
+    Envelope(double fs) { this(fs, 15); }
+    Envelope(double fs, double cutoff) { lp = Biquad.butter(false, 4, fs, cutoff); }
     double put(double x) { return Math.max(0, Biquad.run(lp, Math.abs(x))); }
 }

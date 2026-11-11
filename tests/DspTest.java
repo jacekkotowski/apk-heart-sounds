@@ -7,6 +7,7 @@ import java.util.Random;
 /** Computer-side checks of the heart-sound path. Run with tests/run.sh. Exits with 1 if any check fails. */
 public class DspTest {
     static int fails;
+    static int argmaxF(float[] v) { int b = 0; for (int i = 0; i < v.length; i++) if (v[i] > v[b]) b = i; return b; }
     static void check(String what, boolean ok) { System.out.println((ok ? "PASS  " : "FAIL  ") + what); if (!ok) fails++; }
 
     /** Gain in dB of the chain without noise reduction for a sine at f. */
@@ -135,6 +136,22 @@ public class DspTest {
         int expect = 0; for (double tb = 0.4; tb < secs - 0.6; tb += 60 / 72.0) expect += 2;
         System.out.printf("   humps in the smooth trace: %d, heart sounds in the signal: %d%n", humps, expect);
         check("smooth trace has exactly one hump per heart sound", humps == expect);
+        System.out.println("== Beat analysis and murmur-like-sound flag (synthetic)");
+        double[] c4 = beats(4000, 30, 72, 300); float[] plain = new float[c4.length], murm = new float[c4.length], noiseOnly = new float[c4.length], knock = new float[c4.length];
+        for (int i = 0; i < c4.length; i++) { plain[i] = (float) (c4[i] + 6 * R.nextGaussian()); noiseOnly[i] = (float) (40 * R.nextGaussian()); knock[i] = plain[i]; murm[i] = plain[i]; }
+        for (int i = 4000 * 9; i < 4000 * 9 + 60; i++) knock[i] += 15000;
+        for (double tb = 0.4; tb < 29.4; tb += 60 / 72.0) for (int i = (int) ((tb + 0.08) * 4000); i < (tb + 0.23) * 4000; i++) murm[i] += 25 * R.nextGaussian() * Math.sin(2 * Math.PI * 300 * i / 4000.0); // hiss between S1 and S2
+        Analysis an = Analysis.run(plain, 4000), am = Analysis.run(murm, 4000), ao = Analysis.run(noiseOnly, 4000), ak = Analysis.run(knock, 4000);
+        System.out.printf("   plain beats: reliable %b, rate %.1f, S1-S2 %.3f s, beats %d, between-sounds %.1f dB, flag %d%n", an.reliable, an.rate, an.s1s2, an.beats, an.sysDb, Screen.flag(an));
+        System.out.printf("   with hiss between S1 and S2: rate %.1f, between-sounds %.1f dB, flag %d%n", am.rate, am.sysDb, Screen.flag(am));
+        System.out.printf("   noise only: reliable %b (%s), flag %d;  with a knock: rate %.1f, flag %d%n", ao.reliable, ao.why, Screen.flag(ao), ak.rate, Screen.flag(ak));
+        check("72 beats per minute is measured within 1, S1-S2 gap within 20 ms", an.reliable && Math.abs(an.rate - 72) < 1 && Math.abs(an.s1s2 - 0.30) < 0.02);
+        check("plain beats are not flagged", Screen.flag(an) == 0);
+        check("hiss between S1 and S2 is flagged, rate unchanged", Screen.flag(am) == 1 && Math.abs(am.rate - 72) < 1);
+        check("noise without beats gives no rate and no flag", !ao.reliable && Screen.flag(ao) == -1);
+        check("a knock on the phone changes neither rate nor flag", ak.reliable && Math.abs(ak.rate - 72) < 1 && Screen.flag(ak) == 0);
+        check("typical beat has its highest point at S1", an.avg.length > 100 && Math.abs(argmaxF(an.avg) * Analysis.STEP - an.avgPre) < 0.03);
+        check("result converts to JSON with the flag", an.json().contains("\"flag\":0") && an.json().startsWith("{\"reliable\":true"));
         System.out.println("== Quality and scope");
         Quality qg = new Quality(4000), qn = new Quality(4000);
         double[] good = run(rate, heart, clean, true); for (double v : good) qg.push(v + 2 * R.nextGaussian());

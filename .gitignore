@@ -1,0 +1,14 @@
+# signing: never commit
+*.keystore
+*.jks
+signing.env
+# build output
+out/
+*.apk
+*.idsig
+*.class
+# test output and recordings
+*.wav
+*.csv
+*.png
+*.log

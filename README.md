@@ -1,6 +1,6 @@
 # Heart Sounds
 
-Offline Android recorder for heart sounds picked up by the phone's own microphone pressed against the chest. It records the raw signal, filters it to the heart-sound band, reduces steady noise and draws the result as a smooth trace or a waveform. A second app in this repo; it reuses Codec2 Recorder's screen layout, hand build and filter approach, and shares no code with it at build time.
+Offline Android recorder for heart sounds picked up by the phone's own microphone pressed against the chest. It records the raw signal, filters it to the heart-sound band, reduces steady noise and draws the result as a smooth trace or a waveform. It started inside the Codec2 Recorder project and reuses that app's screen style, hand build (no Gradle) and filter approach, but shares no code with it.
 
 Experimental. Not a medical device and not an ECG: the graph shows sound loudness, not the heart's electrical activity. It cannot diagnose or rule out heart disease.
 
@@ -28,17 +28,19 @@ Current version: 0.2. Roadmap and test status in [PLAN.md](PLAN.md), background 
 
 ## Build
 
-Needs the same tools as Codec2 Recorder except the NDK: Android SDK build-tools 36.0.0 and platforms;android-36, JDK 17 or newer, zip. Uses `../signing.env` and the keystore it names.
+Needs: Android SDK build-tools 36.0.0 and platforms;android-36, JDK 17 or newer, zip. No NDK and no Gradle. Tested on Linux only.
+
+Put `signing.env` in the project folder with two lines, `KS_FILE=path/to/your.keystore` and `KS_PASS=its password`. Neither file is in git. A different signing key means a new version can't install over the old one.
 
 ```
 export ANDROID_SDK_ROOT=...
-bash heart/build.sh        # writes heart/HeartSounds.apk and prints its SHA-256
+bash build.sh        # writes HeartSounds.apk and prints its SHA-256
 ```
 
 ## Tests
 
-- `bash heart/tests/run.sh`: filter frequency response, alias rejection, noise reduction on synthetic beats, level setting, WAV and CSV files. Needs only a JDK.
-- `node heart/tests/ui.js [folder]`: loads the screen in a headless browser with a stand-in for the Android side and saves screenshots. Needs Playwright for Node.
+- `bash tests/run.sh`: filter frequency response, alias rejection, noise reduction on synthetic beats, level setting, WAV and CSV files. Needs only a JDK.
+- `node tests/ui.js [folder]`: loads the screen in a headless browser with a stand-in for the Android side and saves screenshots. Needs Playwright for Node.
 
 ## Known limits
 
@@ -62,3 +64,7 @@ bash heart/build.sh        # writes heart/HeartSounds.apk and prints its SHA-256
 7. ANALYSE: typical beat with S1 and S2, a heart rate, and the flag line. Compare the rate with a pulse count.
 8. AUDIO > Playback pitch > Raised 250 Hz, then PLAY on the phone speaker.
 9. Flight mode: everything still works.
+
+## Licences
+
+The look-ahead limiter and screen style come from Codec2 Recorder, which builds on Codec2Recorder by tschudin (MIT). No third-party code is included. Test data from CirCor DigiScope (Open Data Commons Attribution License v1.0) is not in this repo.

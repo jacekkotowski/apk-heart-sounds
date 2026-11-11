@@ -1,11 +1,10 @@
 #!/bin/bash
-# Builds HeartSounds.apk. Needs ANDROID_SDK_ROOT and ../signing.env, the same signing files as Codec2 Recorder (see ../README.md).
+# Builds HeartSounds.apk. Needs ANDROID_SDK_ROOT and signing.env (see README.md).
 set -e
 cd "$(dirname "$0")"
 S=${ANDROID_SDK_ROOT:?Set ANDROID_SDK_ROOT to your Android SDK}
-[ -f ../signing.env ] || { echo "../signing.env is missing, see ../README.md"; exit 1; }
-. ../signing.env
-case "$KS_FILE" in /*) ;; *) KS_FILE=../$KS_FILE;; esac
+[ -f signing.env ] || { echo "signing.env is missing, see README.md"; exit 1; }
+. ./signing.env
 BT=$S/build-tools/36.0.0; J=$S/platforms/android-36/android.jar; O=out; rm -rf $O; mkdir -p $O/classes $O/res
 $BT/aapt2 compile --dir app/res -o $O/res/res.zip
 $BT/aapt2 link -o $O/base.apk -I $J --manifest app/AndroidManifest.xml --min-sdk-version 29 --target-sdk-version 36 -A app/assets $O/res/res.zip

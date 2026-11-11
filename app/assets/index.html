@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Heart Sounds</title>
+<style>
+/* Same layout and colours as Codec2 Recorder: the recorder deck stays on top; the shelf of recordings scrolls under it. */
+:root{--bg:#1b2430;--panel:#253141;--line:#3a4a5e;--fg:#edf1f5;--dim:#a2b0c0;--rec:#e5484d;--play:#7cc8a4;--amber:#f0b45a;
+--mono:ui-monospace,"Roboto Mono","Droid Sans Mono",monospace;--ui:"Roboto Condensed","sans-serif-condensed",Roboto,sans-serif;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:16px/1.35 var(--ui);overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;max-width:720px;margin:auto}
+#deck{flex:none;max-height:76%;overflow-y:auto;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+#deck>*{flex:none}
+#scope{display:block;width:100%;height:132px;background:var(--bg);border:1px solid var(--line);border-radius:4px}
+#qrow{display:flex;justify-content:space-between;gap:10px}
+#clock{font:600 34px/1 var(--mono);font-variant-numeric:tabular-nums;text-align:center}
+#size{text-align:center;color:var(--dim);font:13px var(--mono);min-height:18px;overflow-wrap:anywhere}
+.meter{height:8px;background:var(--bg);border-radius:2px;overflow:hidden}.meter i{display:block;height:100%;width:0;background:var(--play)}
+#ctl{display:flex;align-items:center;justify-content:center;gap:18px}
+button{font:inherit;font-weight:600;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;min-height:44px;padding:0 12px}
+button:active{background:var(--line)}button:focus-visible,select:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+#recb{width:84px;height:84px;border-radius:50%;background:var(--rec);border:5px solid var(--fg);color:#fff;font-size:15px;font-weight:800;padding:0}
+#recb.on{border-radius:14px;width:76px;height:76px;margin:4px}
+label{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:14px}
+select{flex:1;min-width:0;min-height:44px;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 6px}
+.seg{display:flex}.seg button{flex:1;border-radius:0;margin-left:-1px;font-size:14px;padding:0 6px}.seg button:first-child{border-radius:4px 0 0 4px;margin-left:0}.seg button:last-child{border-radius:0 4px 4px 0}
+.seg button[aria-pressed=true]{background:var(--play);color:#10201a;border-color:var(--play)}
+#row2{display:flex;gap:10px;align-items:center}#row2 label{flex:1;min-width:0}
+#advp{display:flex;flex-direction:column;gap:6px}#advp label{font-size:13px}
+.m{color:var(--dim);font:13px var(--mono);font-variant-numeric:tabular-nums}
+.tip{color:var(--dim);font-size:13px}
+#msg{padding:8px 16px;color:var(--amber);font-size:14px;overflow-wrap:anywhere}#msg:empty{display:none}
+#bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;color:var(--dim);font-size:14px}
+#list{flex:1;overflow-y:auto;padding:4px 16px 14px;display:flex;flex-direction:column;gap:8px}
+.r{border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:6px}
+.n{overflow-wrap:anywhere;font-weight:600}
+.a{display:flex;gap:6px;flex-wrap:wrap}.a button{flex:1 1 auto;min-height:40px;padding:0 8px;font-size:14px}
+.pl{background:var(--play);color:#10201a;border-color:var(--play)}
+input[type=range]{width:100%;accent-color:var(--play);height:28px}
+input[type=text]{flex:1;min-width:0;min-height:40px;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 8px}
+.danger{color:var(--rec)}
+#empty{color:var(--dim);padding:14px 0}
+#note{padding:0 16px 10px;color:var(--dim);font-size:12px}
+[hidden]{display:none!important}
+</style></head><body>
+<div id="app">
+  <div id="deck">
+    <canvas id="scope" aria-label="Heart sound graph, last 6 seconds"></canvas>
+    <div id="qrow" class="m"><span id="q">Signal: --</span><span id="scale"></span></div>
+    <div class="meter" title="Microphone level"><i id="lvl"></i></div>
+    <div id="clock">00:00</div>
+    <div id="size"></div>
+    <div id="ctl"><button id="recb" aria-label="Record">REC</button></div>
+    <div id="view" class="seg" role="group" aria-label="Graph"><button data-v="smooth">Smooth trace</button><button data-v="wave">Waveform</button></div>
+    <div id="seg" class="seg" role="group" aria-label="Filter"><button data-f="heart">Heart sounds</button><button data-f="wide">Wide</button><button data-f="raw">Raw</button></div>
+    <div id="ftip" class="tip"></div>
+    <div id="row2"><label for="dur">Length<select id="dur"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="0">Until STOP (5 min max)</option></select></label><button id="adv">AUDIO</button></div>
+    <div id="advp" hidden>
+      <label for="nr">Noise reduction<select id="nr"><option value="1">Off</option><option value="0.4">Gentle</option><option value="0.2">Medium</option><option value="0.1">Strong</option></select></label>
+      <label for="hum">Mains hum filter<select id="hum"><option value="0">Off</option><option value="50">50 Hz</option><option value="60">60 Hz</option></select></label>
+      <label for="src">Audio source<select id="src"><option value="9">Unprocessed (recommended)</option><option value="6">Voice recognition</option><option value="1">Microphone</option><option value="5">Camcorder (often rear mic)</option></select></label>
+      <label for="mic">Microphone<select id="mic"></select></label>
+      <div class="tip">After REC you have 3 seconds to get in position; a buzz marks the start and a double buzz the end. Phone speakers can't play sounds this low, so use headphones. Filter, noise reduction and hum filter apply to the graph, playback and filtered exports. The saved recording is always the raw microphone signal.</div>
+    </div>
+    <div class="tip" id="how">Press the phone's bottom edge (microphone) onto bare skin on the breastbone. Hold still. Listen with headphones.</div>
+  </div>
+  <div id="msg" role="status"></div>
+  <div id="bar"><span id="count"></span></div>
+  <div id="list"></div>
+  <div id="note">Experimental sound recorder. Not a medical device and not an ECG. It cannot diagnose or rule out heart disease.</div>
+</div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const A = window.Android;
+const FILTERS = { heart: [20, 200, "20–200 Hz: the main heart sounds."], wide: [20, 600, "20–600 Hz: keeps higher sounds too, with more noise."], raw: [0, 0, "No filter and no noise reduction."] };
+const say = t => { $("msg").textContent = t || ""; };
+const fmt = s => { s = Math.floor(s); const z = v => String(v).padStart(2, "0"); return z(Math.floor(s / 60)) + ":" + z(s % 60); };
+const mb = b => b < 1048576 ? (b / 1024).toFixed(0) + " kB" : (b / 1048576).toFixed(1) + " MB";
+const get = (k, d) => { try { const s = localStorage.getItem(k); return s === null ? d : s; } catch (e) { return d; } };
+const put = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+let filter = get("filter", "heart"); if (!FILTERS[filter]) filter = "heart";
+function sendCfg() {
+  const f = FILTERS[filter];
+  for (const b of $("seg").children) b.setAttribute("aria-pressed", b.dataset.f === filter);
+  $("ftip").textContent = f[2];
+  if (A) A.config(+$("src").value, +$("mic").value, f[0], f[1], +$("hum").value, +$("nr").value, +$("dur").value);
+}
+for (const b of $("seg").children) b.addEventListener("click", () => { if (was.rec) return; filter = b.dataset.f; put("filter", filter); sendCfg(); });
+function fillMics() {
+  const el = $("mic"), want = get("mic", el.value || "0");
+  el.textContent = ""; const d = document.createElement("option"); d.value = "0"; d.textContent = "Bottom microphone if the phone names it"; el.append(d);
+  if (A) for (const m of JSON.parse(A.microphones())) { const o = document.createElement("option"); o.value = m.id; o.textContent = m.name; el.append(o); }
+  el.value = want; if (el.value !== want) el.value = "0";
+}
+fillMics();
+if (A && !A.unprocessed()) { $("src").options[0].textContent = "Unprocessed (not on this phone)"; $("src").value = "6"; }
+$("dur").value = "30"; $("nr").value = "0.2";
+const sel = id => { const el = $(id), s = get(id, null); if (s !== null) { el.value = s; if (el.value !== s) el.selectedIndex = 0; } el.addEventListener("change", () => { put(id, el.value); sendCfg(); }); };
+["dur", "nr", "hum", "src", "mic"].forEach(sel);
+$("adv").addEventListener("click", () => { $("advp").hidden = !$("advp").hidden; });
+
+// Graph: the last 6 seconds, one point per 10 ms, scaled to the recent signal so weak heart sounds are visible.
+// Smooth trace is the loudness curve on an ECG-paper-style grid (0.2 s small squares, 1 s bold lines). It is sound, not an ECG.
+let view = get("view", "smooth"); if (view !== "wave") view = "smooth";
+function setView() { for (const b of $("view").children) b.setAttribute("aria-pressed", b.dataset.v === view); }
+for (const b of $("view").children) b.addEventListener("click", () => { view = b.dataset.v; put("view", view); scale = 1; setView(); draw(); });
+const SHOW = 600; let wave = [], waveN = 0, scale = 1;
+function pull() {
+  const w = JSON.parse(A.wave(waveN));
+  if (w.n < waveN) wave = [];
+  for (let i = 0; i < w.d.length; i += 3) wave.push([w.d[i], w.d[i + 1], w.d[i + 2]]);
+  if (wave.length > SHOW) wave.splice(0, wave.length - SHOW);
+  const changed = w.n !== waveN; waveN = w.n; return changed;
+}
+function draw() {
+  const c = $("scope"), r = window.devicePixelRatio || 1, W = Math.round(c.clientWidth * r), H = Math.round(c.clientHeight * r);
+  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+  const g = c.getContext("2d"), cs = getComputedStyle(document.documentElement);
+  g.clearRect(0, 0, W, H);
+  const smooth = view === "smooth", base = smooth ? H - 6 * r : H / 2;
+  g.lineWidth = 1;
+  if (smooth) { g.strokeStyle = "rgba(229,72,77,.22)"; g.beginPath(); const q = W / 30; for (let i = 0; i <= 30; i++) { const x = Math.round(W - i * q) + 0.5; g.moveTo(x, 0); g.lineTo(x, H); } for (let yy = base; yy > 0; yy -= q) { g.moveTo(0, Math.round(yy) + 0.5); g.lineTo(W, Math.round(yy) + 0.5); } g.stroke(); }
+  g.strokeStyle = smooth ? "rgba(229,72,77,.5)" : cs.getPropertyValue("--line"); g.beginPath();
+  for (let s = 0; s <= 6; s++) { const x = Math.round(W - s * W / 6) + 0.5; g.moveTo(x, 0); g.lineTo(x, H); }
+  g.moveTo(0, Math.round(base) + 0.5); g.lineTo(W, Math.round(base) + 0.5); g.stroke();
+  if (!wave.length) { $("scale").textContent = ""; return; }
+  const amp = wave.map(p => smooth ? p[2] : Math.max(Math.abs(p[0]), Math.abs(p[1]))).sort((a, b) => a - b);
+  const want = Math.max(amp[Math.floor(0.98 * (amp.length - 1))] * 1.3, 0.05);
+  scale += (want > scale ? 0.5 : 0.1) * (want - scale);
+  $("scale").textContent = "full height " + (smooth ? "" : "±") + (scale >= 100 ? scale.toFixed(0) : scale.toFixed(1)) + " · 1 s/line";
+  g.strokeStyle = cs.getPropertyValue("--play"); g.beginPath();
+  const X = i => W - (wave.length - i - 0.5) * W / SHOW;
+  if (smooth) {
+    g.lineWidth = 2 * r; g.lineJoin = "round";
+    for (let i = 0; i < wave.length; i++) { const yy = base - Math.min(1, wave[i][2] / scale) * (base - 4 * r); if (i) g.lineTo(X(i), yy); else g.moveTo(X(i), yy); }
+  } else {
+    g.lineWidth = Math.max(1, W / SHOW);
+    const y = v => H / 2 - Math.max(-1, Math.min(1, v / scale)) * (H / 2 - 2);
+    for (let i = 0; i < wave.length; i++) { const a = y(wave[i][1]), b = y(wave[i][0]); g.moveTo(X(i), a); g.lineTo(X(i), Math.max(b, a + 1)); }
+  }
+  g.stroke();
+}
+
+let open = null, confirmDel = null, renaming = null, items = [], was = { rec: false, play: null }, last = { play: null, pos: 0, dur: 0 };
+function row(r, st) {
+  const d = document.createElement("div"); d.className = "r";
+  const n = document.createElement("div"); n.className = "n"; n.textContent = r.name.replace(/\.wav$/, "");
+  const m = document.createElement("div"); m.className = "m"; m.textContent = fmt(r.secs) + " · " + mb(r.bytes) + " · " + (r.rate / 1000) + " kHz raw";
+  d.append(n, m);
+  const a = document.createElement("div"); a.className = "a";
+  const btn = (t, f, c) => { const b = document.createElement("button"); b.textContent = t; if (c) b.className = c; b.addEventListener("click", f); return b; };
+  const playing = st.play === r.name;
+  a.append(btn(playing ? "STOP" : "PLAY", () => { playing ? A.stopPlay() : A.play(r.name); }, "pl"));
+  a.append(btn("MORE", () => { open = open === r.name ? null : r.name; confirmDel = null; renaming = null; render(); }));
+  d.append(a);
+  if (playing) {
+    const s = document.createElement("input"); s.type = "range"; s.min = 0; s.max = 1000; s.id = "seek"; s.setAttribute("aria-label", "Position");
+    s.value = st.dur ? st.pos / st.dur * 1000 : 0;
+    s.addEventListener("change", () => A.seek(s.value / 1000));
+    const t = document.createElement("div"); t.className = "m"; t.id = "pt"; t.textContent = fmt(st.pos) + " / " + fmt(st.dur);
+    d.append(s, t);
+  }
+  if (open === r.name) {
+    const x = document.createElement("div"); x.className = "a";
+    x.append(btn("SHARE", () => A.share(r.name)), btn("SAVE RAW WAV", () => A.saveRaw(r.name)), btn("SAVE FILTERED WAV", () => A.saveFiltered(r.name)), btn("SAVE GRAPH CSV", () => A.saveCsv(r.name)), btn("RENAME", () => { renaming = r.name; render(); }), btn("DELETE", () => { confirmDel = r.name; render(); }, "danger"));
+    d.append(x);
+    if (renaming === r.name) {
+      const y = document.createElement("div"); y.className = "a";
+      const i = document.createElement("input"); i.type = "text"; i.id = "newname"; i.setAttribute("aria-label", "New name"); i.value = r.name.replace(/\.wav$/, "");
+      y.append(i, btn("SAVE", () => { if (A.rename(r.name, i.value)) { renaming = null; open = null; refresh(); } else say("That name can't be used."); }));
+      d.append(y);
+    }
+    if (confirmDel === r.name) {
+      const y = document.createElement("div"); y.className = "a";
+      y.append(btn("YES, DELETE FOREVER", () => { A.remove(r.name); confirmDel = null; open = null; refresh(); }, "danger"), btn("CANCEL", () => { confirmDel = null; render(); }));
+      d.append(y);
+    }
+  }
+  return d;
+}
+function render() {
+  const l = $("list"); l.textContent = "";
+  $("count").textContent = "Recordings: " + items.length;
+  if (!items.length) { const e = document.createElement("div"); e.id = "empty"; e.textContent = "Your recordings appear here. Press REC to start."; l.append(e); }
+  for (const r of items) l.append(row(r, last));
+}
+function refresh() { items = JSON.parse(A.list()); render(); }
+const QUALITY = { good: "Signal: good, clear beats", fair: "Signal: fair", weak: "Signal: weak, no clear beats", "": "Signal: --" };
+function tick() {
+  const s = JSON.parse(A.status());
+  if (s.msg) { say(s.msg); refresh(); }
+  const counting = s.rec && s.count > 0;
+  $("clock").textContent = counting ? "-" + s.count : fmt(s.rec ? s.secs : 0) + (s.rec && s.limit ? " / " + fmt(s.limit) : "");
+  $("clock").style.color = s.rec && !counting ? "var(--rec)" : counting ? "var(--amber)" : "var(--fg)";
+  $("size").textContent = counting ? "Get in position and hold still" : s.rec ? s.info : s.busy ? "Filtering…" : s.play ? "Playing: " + (filter === "raw" ? "raw" : FILTERS[filter][0] + "–" + FILTERS[filter][1] + " Hz") : "";
+  $("lvl").style.width = (s.rec ? Math.round(s.level * 100) : 0) + "%"; $("lvl").style.background = s.clip ? "var(--rec)" : "var(--play)";
+  $("q").textContent = s.clip ? "Signal: microphone overloading" : QUALITY[s.quality] || QUALITY[""];
+  $("q").style.color = s.clip ? "var(--rec)" : s.quality === "good" ? "var(--play)" : s.quality === "weak" ? "var(--amber)" : "var(--dim)";
+  const b = $("recb"); b.textContent = s.rec ? "STOP" : "REC"; b.classList.toggle("on", s.rec);
+  for (const id of ["dur", "nr", "hum", "src", "mic"]) $(id).disabled = s.rec;
+  for (const x of $("seg").children) x.disabled = s.rec;
+  if (was.rec !== s.rec) A.keepOn(s.rec);
+  if (was.rec !== s.rec || was.play !== s.play) { last = s; refresh(); }
+  was = s; last = s;
+  if (pull()) draw();
+  const sk = $("seek");
+  if (sk && !sk.matches(":active") && s.dur) sk.value = s.pos / s.dur * 1000;
+  const pt = $("pt"); if (pt) pt.textContent = fmt(s.pos) + " / " + fmt(s.dur);
+}
+$("recb").addEventListener("click", () => { say(""); if (was.rec) A.stopRec(); else { sendCfg(); A.startRec(); } });
+sendCfg(); setView(); draw();
+if (A) { refresh(); setInterval(tick, 100); tick(); } else say("Open this inside the app.");
+window.addEventListener("resize", draw);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && A) { refresh(); fillMics(); sendCfg(); } });
+$("mic").addEventListener("pointerdown", () => { if (A && !was.rec) fillMics(); });
+</script></body></html>

@@ -4,7 +4,7 @@ Offline Android recorder for heart sounds picked up by the phone's own microphon
 
 Experimental. Not a medical device and not an ECG: the graph shows sound loudness, not the heart's electrical activity. It cannot diagnose or rule out heart disease.
 
-Current version: 0.2. Roadmap and test status in [PLAN.md](PLAN.md), background in [docs/research.md](docs/research.md), test results for the analysis in [docs/validation.md](docs/validation.md).
+Current version: 0.2.1. Roadmap and test status in [PLAN.md](PLAN.md), background in [docs/research.md](docs/research.md), test results for the analysis in [docs/validation.md](docs/validation.md).
 
 ## What it does
 
@@ -30,7 +30,7 @@ Current version: 0.2. Roadmap and test status in [PLAN.md](PLAN.md), background 
 
 Needs: Android SDK build-tools 36.0.0 and platforms;android-36, JDK 17 or newer, zip. No NDK and no Gradle. Tested on Linux only.
 
-Put `signing.env` in the project folder with two lines, `KS_FILE=path/to/your.keystore` and `KS_PASS=its password`. Neither file is in git. A different signing key means a new version can't install over the old one.
+Copy `heartsounds.keystore` and `signing.env` from the `apk-heart-sounds` folder of the private `apk-signing-keys` repository into the project folder. Neither file is in git here. Builds up to 0.2 were signed with temporary keys, so uninstall them before installing 0.2.1 or later; from 0.2.1 on, new versions install over old ones.
 
 ```
 export ANDROID_SDK_ROOT=...

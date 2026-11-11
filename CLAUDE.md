@@ -6,7 +6,7 @@ Records raw 48 kHz WAV from the phone's microphone on the chest. Band-pass, nois
 
 Rules:
 
-- Never commit `*.keystore`, `signing.env`, or anyone's heart recordings.
+- Never commit `*.keystore`, `signing.env`, or anyone's heart recordings. The signing key lives only in the private `apk-signing-keys` repository, folder `apk-heart-sounds`.
 - Never show anything as an ECG, a diagnosis, a named disease, or a heart rate that was not measured. The murmur-like-sound flag is an acoustic flag with its caveat.
 - The flag limit (`Screen.SYS_DB`) was chosen on CirCor data. Re-run the evaluation in `docs/validation.md` before changing it or `Analysis.java`.
 - Run `bash tests/run.sh` and `node tests/ui.js` before handing over a build. State plainly what was not tested on a phone.

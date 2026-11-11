@@ -3,13 +3,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>Heart Sounds</title>
 <style>
-/* Same layout and colours as Codec2 Recorder: the recorder deck stays on top; the shelf of recordings scrolls under it. */
+/* Same colours and controls as Codec2 Recorder. The whole page scrolls, so the analysis panel under a recording has room. */
 :root{--bg:#1b2430;--panel:#253141;--line:#3a4a5e;--fg:#edf1f5;--dim:#a2b0c0;--rec:#e5484d;--play:#7cc8a4;--amber:#f0b45a;
 --mono:ui-monospace,"Roboto Mono","Droid Sans Mono",monospace;--ui:"Roboto Condensed","sans-serif-condensed",Roboto,sans-serif;color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:16px/1.35 var(--ui);overflow:hidden}
-#app{height:100%;display:flex;flex-direction:column;max-width:720px;margin:auto}
-#deck{flex:none;max-height:76%;overflow-y:auto;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+#app{height:100%;display:flex;flex-direction:column;max-width:720px;margin:auto;overflow-y:auto}
+#deck{flex:none;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
 #deck>*{flex:none}
 #scope{display:block;width:100%;height:132px;background:var(--bg);border:1px solid var(--line);border-radius:4px}
 #qrow{display:flex;justify-content:space-between;gap:10px}
@@ -31,7 +31,7 @@ select{flex:1;min-width:0;min-height:44px;font:inherit;color:var(--fg);backgroun
 .tip{color:var(--dim);font-size:13px}
 #msg{padding:8px 16px;color:var(--amber);font-size:14px;overflow-wrap:anywhere}#msg:empty{display:none}
 #bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;color:var(--dim);font-size:14px}
-#list{flex:1;overflow-y:auto;padding:4px 16px 14px;display:flex;flex-direction:column;gap:8px}
+#list{flex:none;padding:4px 16px 14px;display:flex;flex-direction:column;gap:8px}
 .r{border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:6px}
 .n{overflow-wrap:anywhere;font-weight:600}
 .a{display:flex;gap:6px;flex-wrap:wrap}.a button{flex:1 1 auto;min-height:40px;padding:0 8px;font-size:14px}
@@ -58,6 +58,7 @@ input[type=text]{flex:1;min-width:0;min-height:40px;font:inherit;color:var(--fg)
     <div id="row2"><label for="dur">Length<select id="dur"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="0">Until STOP (5 min max)</option></select></label><button id="adv">AUDIO</button></div>
     <div id="advp" hidden>
       <label for="nr">Noise reduction<select id="nr"><option value="1">Off</option><option value="0.4">Gentle</option><option value="0.2">Medium</option><option value="0.1">Strong</option></select></label>
+      <label for="shift">Playback pitch<select id="shift"><option value="0">True (needs headphones)</option><option value="250">Raised 250 Hz (audible on the speaker)</option></select></label>
       <label for="hum">Mains hum filter<select id="hum"><option value="0">Off</option><option value="50">50 Hz</option><option value="60">60 Hz</option></select></label>
       <label for="src">Audio source<select id="src"><option value="9">Unprocessed (recommended)</option><option value="6">Voice recognition</option><option value="1">Microphone</option><option value="5">Camcorder (often rear mic)</option></select></label>
       <label for="mic">Microphone<select id="mic"></select></label>
@@ -85,7 +86,7 @@ function sendCfg() {
   const f = FILTERS[filter];
   for (const b of $("seg").children) b.setAttribute("aria-pressed", b.dataset.f === filter);
   $("ftip").textContent = f[2];
-  if (A) A.config(+$("src").value, +$("mic").value, f[0], f[1], +$("hum").value, +$("nr").value, +$("dur").value);
+  if (A) A.config(+$("src").value, +$("mic").value, f[0], f[1], +$("hum").value, +$("nr").value, +$("dur").value, +$("shift").value);
 }
 for (const b of $("seg").children) b.addEventListener("click", () => { if (was.rec) return; filter = b.dataset.f; put("filter", filter); sendCfg(); });
 function fillMics() {
@@ -98,7 +99,7 @@ fillMics();
 if (A && !A.unprocessed()) { $("src").options[0].textContent = "Unprocessed (not on this phone)"; $("src").value = "6"; }
 $("dur").value = "30"; $("nr").value = "0.2";
 const sel = id => { const el = $(id), s = get(id, null); if (s !== null) { el.value = s; if (el.value !== s) el.selectedIndex = 0; } el.addEventListener("change", () => { put(id, el.value); sendCfg(); }); };
-["dur", "nr", "hum", "src", "mic"].forEach(sel);
+["dur", "nr", "hum", "src", "mic", "shift"].forEach(sel);
 $("adv").addEventListener("click", () => { $("advp").hidden = !$("advp").hidden; });
 
 // Graph: the last 6 seconds, one point per 10 ms, scaled to the recent signal so weak heart sounds are visible.
@@ -195,12 +196,29 @@ function anaPanel(a) {
     line("Heart rate: " + Math.round(a.rate) + " per minute");
     line("First to second heart sound: " + a.s1s2.toFixed(2) + " s · beat length varies ±" + Math.round(a.spread * 50) + "%");
   } else line("Heart rate: unable to estimate reliably (" + a.why + ").");
+  if (a.bt && a.bt.length > 2) {
+    const c2 = document.createElement("canvas"); c2.style.height = "70px"; c2.setAttribute("aria-label", "Beat by beat"); p.append(c2); requestAnimationFrame(() => drawStrip(c2, a));
+    const odd = []; a.bo.forEach((o, i) => { if (o) odd.push(fmt(a.bt[i]) + " " + ODD[o]); });
+    line("Each dot is one beat, higher is faster. " + (odd.length ? "Unusual beats (amber): " + odd.length + " of " + a.bt.length + " — " + odd.slice(0, 8).join(", ") + (odd.length > 8 ? ", …" : "") + ". Unusual means different from this recording's typical beat, often a knock or movement." : "No beat stood out from the typical one."), "tip");
+  }
   const f = line(a.flag === 1 ? "Flagged: extra sound between the two heart sounds" : a.flag === 0 ? "Not flagged: no extra sound between the two heart sounds" : "Murmur-like sound: cannot tell from this recording", "v flag");
   f.style.color = a.flag === 1 ? "var(--amber)" : "var(--fg)";
   if (a.sysDb !== null) line("Sound between the first and second heart sound is " + (a.sysDb >= 0 ? "+" : "") + a.sysDb.toFixed(1) + " dB against the quiet gap after the second; above the +3 dB limit in " + Math.round(a.sysShare * 100) + "% of beats.", "tip");
   line(a.flag === 1 ? "This can be a murmur. It can also be breathing, rubbing or room noise, and many murmurs are harmless. Only a doctor listening with a stethoscope can tell. Record again to see if it repeats."
     : "Experimental and tested only on stethoscope recordings of children, not on phones. There it missed about 4 in 10 murmurs. It cannot name or rule out any heart disease. If you have symptoms or concerns, see a doctor whatever this says.", "tip");
   return p;
+}
+const ODD = ["", "timing", "knock or loud noise", "different shape"];
+function drawStrip(c, a) {
+  const r = window.devicePixelRatio || 1, W = Math.round(c.clientWidth * r), H = Math.round(c.clientHeight * r); c.width = W; c.height = H;
+  const g = c.getContext("2d"), cs = getComputedStyle(document.documentElement), med = a.cycle || 1;
+  const X = t => t / a.seconds * W, Y = iv => H / 2 - Math.max(-1, Math.min(1, (med / iv - 1) / 0.5)) * (H / 2 - 6 * r);
+  g.strokeStyle = cs.getPropertyValue("--line"); g.lineWidth = 1; g.beginPath(); g.moveTo(0, H / 2 + 0.5); g.lineTo(W, H / 2 + 0.5); g.stroke();
+  for (let i = 0; i < a.bt.length; i++) {
+    g.fillStyle = a.bo[i] ? cs.getPropertyValue("--amber") : cs.getPropertyValue("--play");
+    g.beginPath(); g.arc(X(a.bt[i]), a.bi[i] > 0 ? Y(a.bi[i]) : H / 2, (a.bo[i] ? 4 : 3) * r, 0, 7); g.fill();
+  }
+  g.fillStyle = cs.getPropertyValue("--dim"); g.font = 11 * r + "px sans-serif"; g.fillText("line: typical rate", 4 * r, 12 * r);
 }
 function drawBeat(c, a) {
   const r = window.devicePixelRatio || 1, W = Math.round(c.clientWidth * r), H = Math.round(c.clientHeight * r); c.width = W; c.height = H;
@@ -228,7 +246,7 @@ function tick() {
   const counting = s.rec && s.count > 0;
   $("clock").textContent = counting ? "-" + s.count : fmt(s.rec ? s.secs : 0) + (s.rec && s.limit ? " / " + fmt(s.limit) : "");
   $("clock").style.color = s.rec && !counting ? "var(--rec)" : counting ? "var(--amber)" : "var(--fg)";
-  $("size").textContent = counting ? "Get in position and hold still" : s.rec ? s.info : s.busy ? "Filtering…" : s.play ? "Playing: " + (filter === "raw" ? "raw" : FILTERS[filter][0] + "–" + FILTERS[filter][1] + " Hz") : "";
+  $("size").textContent = counting ? "Get in position and hold still" : s.rec ? s.info : s.busy ? "Filtering…" : s.play ? "Playing: " + (filter === "raw" ? "raw" : FILTERS[filter][0] + "–" + FILTERS[filter][1] + " Hz" + (+$("shift").value ? ", pitch raised " + $("shift").value + " Hz" : "")) : "";
   $("lvl").style.width = (s.rec ? Math.round(s.level * 100) : 0) + "%"; $("lvl").style.background = s.clip ? "var(--rec)" : "var(--play)";
   $("q").textContent = s.clip ? "Signal: microphone overloading" : QUALITY[s.quality] || QUALITY[""];
   $("q").style.color = s.clip ? "var(--rec)" : s.quality === "good" ? "var(--play)" : s.quality === "weak" ? "var(--amber)" : "var(--dim)";
@@ -238,7 +256,7 @@ function tick() {
   if (was.rec !== s.rec) A.keepOn(s.rec);
   if (was.rec !== s.rec || was.play !== s.play) { last = s; refresh(); }
   was = s; last = s;
-  if (anaWait) { const j = JSON.parse(A.analysis()); if (j) { if (j.a) ana[j.name] = j.a; anaWait = null; render(); } }
+  if (anaWait) { const j = JSON.parse(A.analysis()); if (j) { if (j.a) ana[j.name] = j.a; anaWait = null; render(); const el = document.querySelector('.ana'); if (el) el.scrollIntoView({ block: 'nearest' }); } }
   if (pull()) draw();
   const sk = $("seek");
   if (sk && !sk.matches(":active") && s.dur) sk.value = s.pos / s.dur * 1000;

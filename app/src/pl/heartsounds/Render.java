@@ -46,10 +46,26 @@ final class Render {
         return Math.min(MAX_GAIN, TARGET / Math.max(a[(int) (PCT * (a.length - 1))], 1e-3));
     }
 
-    /** Writes a WAV for listening: filtered at about 4 kHz, or in Raw mode the original rate, raised to a comfortable level. Returns the gain used. */
-    static double wav(File raw, File out, Cfg c) throws IOException {
+    /**
+     * Moves every frequency up by the same number of Hz, keeping the timing. Heart sounds at 50-200 Hz land at
+     * 300-450 Hz, where ears and phone speakers work. The result is altered sound, for listening only.
+     */
+    static float[] shiftUp(float[] x, int fs, double hz) {
+        int n = 1; while (n < x.length) n <<= 1;
+        double[] re = new double[n], im = new double[n]; for (int i = 0; i < x.length; i++) re[i] = x[i];
+        PcgDenoiser.fft(re, im, false);
+        int k = (int) Math.round(hz * n / fs), half = n / 2;
+        double[] r2 = new double[n], i2 = new double[n];
+        for (int b = 1; b + k < half; b++) { r2[b + k] = re[b]; i2[b + k] = im[b]; r2[n - b - k] = re[b]; i2[n - b - k] = -im[b]; }
+        PcgDenoiser.fft(r2, i2, true);
+        float[] y = new float[x.length]; for (int i = 0; i < y.length; i++) y[i] = (float) r2[i];
+        return y;
+    }
+
+    /** Writes a WAV for listening: filtered at about 4 kHz, or in Raw mode the original rate, raised to a comfortable level. shiftHz above 0 raises the pitch (not in Raw mode). Returns the gain used. */
+    static double wav(File raw, File out, Cfg c, double shiftHz) throws IOException {
         if (!c.raw()) {
-            int[] fs = {0}; float[] x = signal(raw, c, fs); double g = gain(x, fs[0]);
+            int[] fs = {0}; float[] x = signal(raw, c, fs); if (shiftHz > 0) x = shiftUp(x, fs[0], shiftHz); double g = gain(x, fs[0]);
             Limiter lim = new Limiter(CEILING, 32, fs[0]);
             try (OutputStream o = new BufferedOutputStream(new FileOutputStream(out), 1 << 16)) {
                 o.write(Wav.header(fs[0], x.length * 2L));

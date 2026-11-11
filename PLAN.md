@@ -6,7 +6,8 @@ Last updated: 2026-11-11
 
 | Part | State |
 |---|---|
-| Record raw WAV, countdown, timed stop, screen-off recording | Built, not yet run on a phone |
+| Record raw WAV, timed stop | Worked on the owner's phone in 0.1: a 30 s recording with clear heart sounds |
+| Countdown, buzzes, screen-off recording | Built, not confirmed on a phone |
 | Unprocessed source, bottom microphone, effects switched off, fallbacks | Built, not yet run on a phone |
 | Play, seek, rename, delete, share, save raw WAV | Built, not yet run on a phone |
 | Band-pass 20–200 and 20–600 Hz, hum filter | Frequency response measured on a computer |
@@ -14,9 +15,12 @@ Last updated: 2026-11-11
 | Smooth trace and waveform graph | Tested on synthetic beats and in a headless browser |
 | Filtered WAV and graph CSV export | File contents tested on a computer |
 | Signal quality label | Tested on synthetic beats only |
-| Heart rate and S1/S2 detection | Not started |
+| Beat finding, heart rate, typical beat (ANALYSE) | Tested on 1,749 stethoscope recordings and one phone recording, see docs/validation.md. Not run on a phone |
+| Murmur-like-sound flag | Tested on stethoscope recordings of children only: 59% of murmurs flagged, 4% false flags. Not tested on phones or adults |
+| Unusual-beat marks | Built, not validated |
+| Raised-pitch playback | Tested on a computer, not heard on a phone |
 | Smaller files (see below) | Not started |
-| Screening for unusual sounds | Not started; only after the steps above are confirmed on real recordings |
+| Naming any disease | Not built and not planned: no data supports it |
 
 ## Measured on a computer (tests/run.sh)
 
@@ -28,13 +32,19 @@ Last updated: 2026-11-11
 
 The beats in these tests are synthetic bursts, not real heart sounds.
 
-## Next step 1: phone test
+## Found on the owner's phone (one 30 s recording, 2026-11-11)
 
-Run the checklist in README.md. Send back one raw WAV from the chest: it shows the microphone's real low-frequency response and noise, and settles the filter band, noise reduction strength and default source.
+- Unprocessed source at 48 kHz, no clipping, heart sounds at about 100 to 300 of 32767.
+- The microphone cuts off steeply below about 50 Hz; most energy is at 60 to 150 Hz. The 20 Hz filter edge is harmless but the usable band starts near 50 Hz.
+- Analysis: 81 beats per minute, first to second sound 0.31 s, 34 clean beats, no flag. No reference measurement was taken.
 
-## Next step 2: heart rate
+## Next step 1: phone test of 0.2
 
-Find beats from the smooth trace, pair S1 and S2 so each beat counts once, and show a rate only when the beats repeat regularly; otherwise "Unable to estimate reliably". Benchmark against annotated PhysioNet/CinC 2016 recordings before showing it.
+Run the checklist in README.md, and count the pulse during one recording to check the heart rate.
+
+## Next step 2: phone validation of the flag
+
+See the last section of docs/validation.md. Until then the flag stays labelled experimental.
 
 ## Next step 3: smaller files
 

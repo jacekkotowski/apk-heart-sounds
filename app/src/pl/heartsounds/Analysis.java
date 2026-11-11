@@ -22,6 +22,8 @@ final class Analysis {
     float[] avg = new float[0], avgLo = new float[0], avgHi = new float[0]; double avgPre = 0.15;
     /** Sound in the gap S1 to S2 relative to the gap S2 to S1, in dB: middle value over beats, and the share of beats above the flag limit. */
     double sysDb = Double.NaN, sysShare, diaDb = Double.NaN;
+    /** Every beat: time of its first sound, length to the next (0 when unknown), and why it is unusual (0 not, 1 timing, 2 knock or loud noise, 3 different shape). */
+    double[] beatT = new double[0], beatLen = new double[0]; int[] beatOdd = new int[0];
 
     private static double[] blockMean(double[] x, int k) { double[] o = new double[x.length / k]; for (int i = 0; i < o.length; i++) { double s = 0; for (int j = 0; j < k; j++) s += x[i * k + j]; o[i] = s / k; } return o; }
     private static double pct(double[] a, double p) { if (a.length == 0) return 0; double[] c = a.clone(); Arrays.sort(c); return c[(int) Math.round(p * (c.length - 1))]; }
@@ -124,6 +126,21 @@ final class Analysis {
             a.avg = new float[len]; a.avgLo = new float[len]; a.avgHi = new float[len]; double[] col = new double[rows];
             for (int j = 0; j < len; j++) { for (int r = 0; r < rows; r++) col[r] = seg[r][j]; a.avg[j] = (float) pct(col, 0.5); a.avgLo[j] = (float) pct(col, 0.25); a.avgHi[j] = (float) pct(col, 0.75); }
         }
+        // Unusual beats: different from this recording's own typical beat. Not a medical finding.
+        a.beatT = new double[nc]; a.beatLen = new double[nc]; a.beatOdd = new int[nc];
+        for (int i = 0; i < nc; i++) {
+            a.beatT[i] = a.s1[i];
+            boolean whole = i + 1 < nc && both[i] && both[i + 1]; double bl = whole ? (p1[i + 1] - p1[i]) * STEP : 0; a.beatLen[i] = bl;
+            int end = Math.min(n - 1, p1[i] + (int) Math.round(a.cycle / STEP)), pk = argmax(e, p1[i], end);
+            if (pk >= 0 && e[pk] > 4 * cap) { a.beatOdd[i] = 2; continue; }
+            if (whole && Math.abs(bl - a.cycle) > 0.25 * a.cycle) { a.beatOdd[i] = 1; continue; }
+            if (a.avg.length > 0 && both[i] && p1[i] - pre >= 0 && p1[i] - pre + len <= n) {
+                double sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+                for (int j = 0; j < len; j++) { double u = e[p1[i] - pre + j], v = a.avg[j]; sx += u; sy += v; sxx += u * u; syy += v * v; sxy += u * v; }
+                double r = (len * sxy - sx * sy) / Math.sqrt(Math.max(1e-12, (len * sxx - sx * sx) * (len * syy - sy * sy)));
+                if (r < 0.15) a.beatOdd[i] = 3; // real beats match the typical one at 0.3 to 0.8; only a clear mismatch counts
+            }
+        }
         if (a.found < 0.6) a.why = "only " + Math.round(100 * a.found) + "% of beats were clear";
         else if (a.spread > 0.5) a.why = "the beat length varies too much to trust";
         else a.reliable = true;
@@ -136,6 +153,6 @@ final class Analysis {
     String json() {
         return "{\"reliable\":" + reliable + ",\"why\":\"" + why + "\",\"seconds\":" + num(seconds) + ",\"rate\":" + num(rate) + ",\"cycle\":" + num(cycle) + ",\"s1s2\":" + num(s1s2) + ",\"spread\":" + num(spread)
                 + ",\"beats\":" + beats + ",\"found\":" + num(found) + ",\"sysDb\":" + num(sysDb) + ",\"sysShare\":" + num(sysShare) + ",\"flag\":" + Screen.flag(this)
-                + ",\"s1\":" + arr(s1) + ",\"s2\":" + arr(s2) + ",\"step\":" + STEP + ",\"pre\":" + avgPre + ",\"avg\":" + arr(avg) + ",\"lo\":" + arr(avgLo) + ",\"hi\":" + arr(avgHi) + "}";
+                + ",\"bt\":" + arr(beatT) + ",\"bi\":" + arr(beatLen) + ",\"bo\":" + java.util.Arrays.toString(beatOdd).replace(" ", "") + ",\"s1\":" + arr(s1) + ",\"s2\":" + arr(s2) + ",\"step\":" + STEP + ",\"pre\":" + avgPre + ",\"avg\":" + arr(avg) + ",\"lo\":" + arr(avgLo) + ",\"hi\":" + arr(avgHi) + "}";
     }
 }

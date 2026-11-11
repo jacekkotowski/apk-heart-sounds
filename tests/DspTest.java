@@ -114,19 +114,19 @@ public class DspTest {
         for (int i = rate * 10; i < rate * 10 + 200; i++) rec[i] += 20000; // one knock on the phone
         writeWav(raw, rate, rec);
         check("WAV header: rate and length read back", Wav.rate(raw) == rate && Wav.samples(raw) == rec.length);
-        long t0 = System.nanoTime(); double g = Render.wav(raw, out, new Cfg(20, 200, 0, 0.2)); double ms = (System.nanoTime() - t0) / 1e6;
+        long t0 = System.nanoTime(); double g = Render.wav(raw, out, new Cfg(20, 200, 0, 0.2), 0); double ms = (System.nanoTime() - t0) / 1e6;
         byte[] ob = java.nio.file.Files.readAllBytes(out.toPath());
         int pk = 0, big = 0; for (int i = Wav.HEADER; i + 1 < ob.length; i += 2) { int v = Math.abs((short) ((ob[i] & 255) | (ob[i + 1] << 8))); pk = Math.max(pk, v); if (v > 8000) big++; }
         System.out.printf("   filtered listening file: %d Hz, gain %.0fx, peak %d, %d samples above 8000, rendered 30 s in %.0f ms%n", Wav.rate(out), g, pk, big, ms);
         check("filtered file is 4000 Hz and never exceeds the limiter ceiling", Wav.rate(out) == 4000 && pk <= Render.CEILING);
         check("a knock does not set the level: quiet beats are raised above 8000", g > 100 && big > 500);
         check("rendering 30 s takes under 3 s on this computer", ms < 3000);
-        double g2 = Render.wav(raw, out, new Cfg(0, 0, 0, 1));
+        double g2 = Render.wav(raw, out, new Cfg(0, 0, 0, 1), 0);
         check("raw listening file keeps the original rate and length", Wav.rate(out) == rate && Wav.samples(out) == rec.length && g2 > 1);
         Render.csv(raw, csv, new Cfg(20, 200, 0, 0.2));
         java.util.List<String> lines = java.nio.file.Files.readAllLines(csv.toPath());
         check("CSV has a header and one row per filtered sample, with the smooth trace", lines.get(0).equals("time_s,pcg_heart20-200,smooth_trace") && lines.get(4001).split(",").length == 3 && lines.size() == rec.length / 12 + 1 && lines.get(4001).startsWith("1.00000,"));
-        byte[] before = java.nio.file.Files.readAllBytes(raw.toPath()); Render.wav(raw, out, new Cfg(20, 600, 50, 0.1));
+        byte[] before = java.nio.file.Files.readAllBytes(raw.toPath()); Render.wav(raw, out, new Cfg(20, 600, 50, 0.1), 250);
         check("the raw recording is unchanged by rendering", java.util.Arrays.equals(before, java.nio.file.Files.readAllBytes(raw.toPath())));
 
         System.out.println("== Smooth trace");
@@ -152,6 +152,20 @@ public class DspTest {
         check("a knock on the phone changes neither rate nor flag", ak.reliable && Math.abs(ak.rate - 72) < 1 && Screen.flag(ak) == 0);
         check("typical beat has its highest point at S1", an.avg.length > 100 && Math.abs(argmaxF(an.avg) * Analysis.STEP - an.avgPre) < 0.03);
         check("result converts to JSON with the flag", an.json().contains("\"flag\":0") && an.json().startsWith("{\"reliable\":true"));
+        int oddPlain = 0, oddKnock = 0; boolean knockAt9 = false;
+        for (int o : an.beatOdd) if (o != 0) oddPlain++;
+        for (int i = 0; i < ak.beatOdd.length; i++) if (ak.beatOdd[i] != 0) { oddKnock++; if (ak.beatOdd[i] == 2 && Math.abs(ak.beatT[i] - 9) < 1) knockAt9 = true; }
+        System.out.printf("   unusual beats: plain %d of %d, with knock %d of %d%n", oddPlain, an.beatOdd.length, oddKnock, ak.beatOdd.length);
+        check("plain beats have no unusual beat; the knock is marked as a knock and nothing else is", oddPlain == 0 && knockAt9 && oddKnock <= 2);
+        System.out.println("== Raised-pitch playback");
+        float[] tone = new float[4000 * 4]; for (int i = 0; i < tone.length; i++) tone[i] = (float) (1000 * Math.sin(2 * Math.PI * 100 * i / 4000.0) * (i % 4000 < 400 ? 1 : 0.05));
+        float[] up = Render.shiftUp(tone, 4000, 250);
+        double p350 = 0, p150 = 0, p100 = 0, q350 = 0, q150 = 0, q100 = 0, eIn = 0, eOut = 0;
+        for (int i = 0; i < up.length; i++) { double t = i / 4000.0; p350 += up[i] * Math.cos(2 * Math.PI * 350 * t); q350 += up[i] * Math.sin(2 * Math.PI * 350 * t); p150 += up[i] * Math.cos(2 * Math.PI * 150 * t); q150 += up[i] * Math.sin(2 * Math.PI * 150 * t); p100 += up[i] * Math.cos(2 * Math.PI * 100 * t); q100 += up[i] * Math.sin(2 * Math.PI * 100 * t); }
+        for (int i = 0; i < 400; i++) { eIn += tone[i] * tone[i]; eOut += up[i] * up[i]; }
+        double a350 = Math.hypot(p350, q350), a150 = Math.hypot(p150, q150), a100 = Math.hypot(p100, q100);
+        System.out.printf("   100 Hz bursts raised 250 Hz: 350 Hz %.0f, 150 Hz %.1f dB below, 100 Hz %.1f dB below, burst energy kept %.0f%%%n", a350, 20 * Math.log10(a350 / (a150 + 1e-9)), 20 * Math.log10(a350 / (a100 + 1e-9)), 100 * eOut / eIn);
+        check("100 Hz moves to 350 Hz with nothing left at 100 or 150 Hz (over 40 dB down), and bursts stay in place", a350 / (a150 + 1e-9) > 100 && a350 / (a100 + 1e-9) > 100 && eOut / eIn > 0.9 && eOut / eIn < 1.1);
         System.out.println("== Quality and scope");
         Quality qg = new Quality(4000), qn = new Quality(4000);
         double[] good = run(rate, heart, clean, true); for (double v : good) qg.push(v + 2 * R.nextGaussian());

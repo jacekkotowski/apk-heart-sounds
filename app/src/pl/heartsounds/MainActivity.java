@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     private static final int BG = Color.rgb(27, 36, 48);
     private WebView web;
     private volatile int source = MediaRecorder.AudioSource.UNPROCESSED, device = 0, durSec = 30;
+    private volatile double shiftHz = 0;
     private volatile Cfg cfg = new Cfg(20, 200, 0, 0.2);
     private boolean pending;
     private volatile Thread player;
@@ -116,12 +117,12 @@ public class MainActivity extends Activity {
     private void play(String name) {
         stopPlayback();
         if (RecService.running) return;
-        final File f = named(name), tmp = new File(getCacheDir(), "play.wav"); final Cfg c = cfg;
+        final File f = named(name), tmp = new File(getCacheDir(), "play.wav"); final Cfg c = cfg; final double shift = shiftHz;
         playStop = false; playName = name; playPos = 0; playDur = 0; seekTo = -1;
         player = new Thread(() -> {
             AudioTrack tr = null;
             try {
-                busy = true; try { Render.wav(f, tmp, c); } finally { busy = false; }
+                busy = true; try { Render.wav(f, tmp, c, shift); } finally { busy = false; }
                 try (RandomAccessFile in = new RandomAccessFile(tmp, "r")) {
                     int rate = Wav.rate(tmp); long total = Wav.samples(tmp);
                     if (rate < 0 || total == 0) throw new IllegalStateException("the recording is empty");
@@ -228,8 +229,8 @@ public class MainActivity extends Activity {
             }
             return s.append(']').toString();
         }
-        @JavascriptInterface public void config(int src, int dev, double lo, double hi, double hum, double floor, int dur) {
-            source = src; device = dev; durSec = dur; cfg = new Cfg(lo, hi, hum, floor);
+        @JavascriptInterface public void config(int src, int dev, double lo, double hi, double hum, double floor, int dur, double shift) {
+            shiftHz = shift; source = src; device = dev; durSec = dur; cfg = new Cfg(lo, hi, hum, floor);
         }
         /** Keeps the screen on while recording, so the timed recording can be watched. */
         @JavascriptInterface public void keepOn(boolean on) {
@@ -261,7 +262,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void saveFiltered(String name) {
             final Cfg c = cfg; if (c.raw()) { notice = "Choose Heart sounds or Wide first. Raw is saved with SAVE RAW WAV."; return; }
-            export(name.replaceAll("\\.wav$", "") + "_" + c.tag() + ".wav", "audio/wav", tmp -> Render.wav(named(name), tmp, c));
+            export(name.replaceAll("\\.wav$", "") + "_" + c.tag() + ".wav", "audio/wav", tmp -> Render.wav(named(name), tmp, c, 0));
         }
         /** Finds the beats in a recording and measures them. The result is read with analysis(). */
         @JavascriptInterface public void analyse(String name) {

@@ -25,8 +25,16 @@ final class Analysis {
     /** Every beat: time of its first sound, length to the next (0 when unknown), and why it is unusual (0 not, 1 timing, 2 knock or loud noise, 3 different shape). */
     double[] beatT = new double[0], beatLen = new double[0]; int[] beatOdd = new int[0];
 
+    // For the report only. Nothing below takes part in finding beats or in the flag.
+    /** The two loudness curves, one value per STEP, starting envT0 seconds into the recording: heart-sound band (40-200 Hz) and higher band. */
+    double[] envLo = new double[0], envHi = new double[0]; double envT0;
+    /** Every beat, same order as beatT: both heart sounds found, and the two per-beat values behind sysDb and diaDb (NaN when not measured). */
+    boolean[] beatOk = new boolean[0]; double[] beatSys = new double[0], beatDia = new double[0];
+    /** Typical beat in the higher band, like avg, avgLo and avgHi. */
+    float[] avgM = new float[0], avgMLo = new float[0], avgMHi = new float[0];
+
     private static double[] blockMean(double[] x, int k) { double[] o = new double[x.length / k]; for (int i = 0; i < o.length; i++) { double s = 0; for (int j = 0; j < k; j++) s += x[i * k + j]; o[i] = s / k; } return o; }
-    private static double pct(double[] a, double p) { if (a.length == 0) return 0; double[] c = a.clone(); Arrays.sort(c); return c[(int) Math.round(p * (c.length - 1))]; }
+    static double pct(double[] a, double p) { if (a.length == 0) return 0; double[] c = a.clone(); Arrays.sort(c); return c[(int) Math.round(p * (c.length - 1))]; }
     private static int argmax(double[] e, int from, int to) { from = Math.max(0, from); to = Math.min(e.length - 1, to); int b = from; for (int i = from; i <= to; i++) if (e[i] > e[b]) b = i; return from > to ? -1 : b; }
     private static double mean(double[] e, int from, int to) { double s = 0; for (int i = from; i <= to; i++) s += e[i]; return s / (to - from + 1); }
 
@@ -43,6 +51,7 @@ final class Analysis {
             if (i >= skip) { E[i - skip] = h; M[i - skip] = m; }
         }
         double[] e = blockMean(E, k), m = blockMean(M, k); int n = e.length; double t0 = skip / fs;
+        a.envLo = e; a.envHi = m; a.envT0 = t0;
         double cap = pct(e, 0.97), med = pct(e, 0.5);
         if (cap <= 0) { a.why = "the recording is silent"; return a; }
         double[] ec = new double[n]; double avgE = 0; for (int i = 0; i < n; i++) { ec[i] = Math.min(e[i], cap); avgE += ec[i]; } avgE /= n; // a knock cannot outweigh the beats
@@ -64,7 +73,7 @@ final class Analysis {
             if (s > top) { top = s; anchor = i; }
         }
         if (anchor < 0) { a.why = "no clear heart sounds were found"; return a; }
-        int[] seq = new int[n / lo + 4]; boolean[] ok = new boolean[seq.length]; int cnt = 0;
+        int[] seq = new int[(int) (n / (0.8 * lo)) + 8]; /* room for the shortest beat length the search allows */ boolean[] ok = new boolean[seq.length]; int cnt = 0;
         int[] back = new int[seq.length]; boolean[] backOk = new boolean[seq.length]; int nb = 0;
         double tl = T; int cur = anchor;
         while (cur - tl * 1.25 >= 0 && nb < back.length) {
@@ -101,6 +110,7 @@ final class Analysis {
         double[] iv = new double[nc], sg = new double[nc], sdb = new double[nc], ddb = new double[nc]; int ni = 0, nm = 0, goodBeats = 0, above = 0;
         int a1 = (int) Math.round(0.07 / STEP), b1 = (int) Math.round(0.06 / STEP);
         double noise = pct(m, 0.1);
+        double[] bSys = new double[nc], bDia = new double[nc]; Arrays.fill(bSys, Double.NaN); Arrays.fill(bDia, Double.NaN);
         for (int i = 0; i < nc; i++) {
             if (both[i]) goodBeats++;
             if (i + 1 >= nc || !both[i] || !both[i + 1]) continue;
@@ -110,7 +120,7 @@ final class Analysis {
             if (sB - sA < 3 || dB - dA < 3) continue;
             if (argmax(e, p1[i], p1[i + 1]) >= 0 && e[argmax(e, p1[i], p1[i + 1])] > 4 * cap) continue; // a knock inside this beat
             double sys = mean(m, sA, sB), dia = mean(m, dA, dB);
-            sdb[nm] = 20 * Math.log10((sys + 1e-9) / (dia + 1e-9)); ddb[nm] = 20 * Math.log10((dia + 1e-9) / (noise + 1e-9)); if (sdb[nm] >= Screen.SYS_DB) above++; nm++;
+            sdb[nm] = 20 * Math.log10((sys + 1e-9) / (dia + 1e-9)); ddb[nm] = 20 * Math.log10((dia + 1e-9) / (noise + 1e-9)); if (sdb[nm] >= Screen.SYS_DB) above++; bSys[i] = sdb[nm]; bDia[i] = ddb[nm]; nm++;
         }
         a.found = goodBeats / (double) nc; a.beats = ni;
         a.s1 = new double[nc]; a.s2 = new double[nc]; for (int i = 0; i < nc; i++) { a.s1[i] = t0 + p1[i] * STEP; a.s2[i] = t0 + p2[i] * STEP; }
@@ -120,14 +130,17 @@ final class Analysis {
         if (nm >= 5) { a.sysDb = pct(Arrays.copyOf(sdb, nm), 0.5); a.sysShare = above / (double) nm; a.diaDb = pct(Arrays.copyOf(ddb, nm), 0.5); }
 
         // Typical beat: line the beats up on S1 and take the middle value at each moment, so knocks and noise drop out.
-        int pre = (int) Math.round(a.avgPre / STEP), len = pre + (int) Math.round(a.cycle / STEP) + (int) Math.round(0.12 / STEP), rows = 0; double[][] seg = new double[nc][];
-        for (int i = 0; i < nc; i++) if (both[i] && p1[i] - pre >= 0 && p1[i] - pre + len <= n) seg[rows++] = Arrays.copyOfRange(e, p1[i] - pre, p1[i] - pre + len);
+        int pre = (int) Math.round(a.avgPre / STEP), len = pre + (int) Math.round(a.cycle / STEP) + (int) Math.round(0.12 / STEP), rows = 0; double[][] seg = new double[nc][], segM = new double[nc][];
+        for (int i = 0; i < nc; i++) if (both[i] && p1[i] - pre >= 0 && p1[i] - pre + len <= n) { segM[rows] = Arrays.copyOfRange(m, p1[i] - pre, p1[i] - pre + len); seg[rows++] = Arrays.copyOfRange(e, p1[i] - pre, p1[i] - pre + len); }
         if (rows >= 4) {
             a.avg = new float[len]; a.avgLo = new float[len]; a.avgHi = new float[len]; double[] col = new double[rows];
             for (int j = 0; j < len; j++) { for (int r = 0; r < rows; r++) col[r] = seg[r][j]; a.avg[j] = (float) pct(col, 0.5); a.avgLo[j] = (float) pct(col, 0.25); a.avgHi[j] = (float) pct(col, 0.75); }
+            a.avgM = new float[len]; a.avgMLo = new float[len]; a.avgMHi = new float[len];
+            for (int j = 0; j < len; j++) { for (int r = 0; r < rows; r++) col[r] = segM[r][j]; a.avgM[j] = (float) pct(col, 0.5); a.avgMLo[j] = (float) pct(col, 0.25); a.avgMHi[j] = (float) pct(col, 0.75); }
         }
         // Unusual beats: different from this recording's own typical beat. Not a medical finding.
         a.beatT = new double[nc]; a.beatLen = new double[nc]; a.beatOdd = new int[nc];
+        a.beatOk = Arrays.copyOf(both, nc); a.beatSys = bSys; a.beatDia = bDia;
         for (int i = 0; i < nc; i++) {
             a.beatT[i] = a.s1[i];
             boolean whole = i + 1 < nc && both[i] && both[i + 1]; double bl = whole ? (p1[i + 1] - p1[i]) * STEP : 0; a.beatLen[i] = bl;

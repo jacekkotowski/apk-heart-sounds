@@ -10,11 +10,12 @@ import android.provider.OpenableColumns;
 import java.io.File;
 import java.io.FileNotFoundException;
 
-/** Hands one recording to the app the user picked in the share sheet. */
+/** Hands one recording, or one report PDF, to the app the user picked in the share sheet. */
 public class FilesProvider extends ContentProvider {
     @Override public boolean onCreate() { return true; }
     private File file(Uri u) throws FileNotFoundException {
-        File f = new File(MainActivity.dir(getContext()), new File(u.getLastPathSegment()).getName());
+        String name = new File(u.getLastPathSegment()).getName(); boolean report = u.getPathSegments().size() == 2 && "report".equals(u.getPathSegments().get(0));
+        File f = new File(report ? MainActivity.reportDir(getContext()) : MainActivity.dir(getContext()), name);
         if (!f.exists()) throw new FileNotFoundException();
         return f;
     }
@@ -24,7 +25,7 @@ public class FilesProvider extends ContentProvider {
         try { File f = file(u); c.addRow(new Object[]{f.getName(), f.length()}); } catch (FileNotFoundException ignored) {}
         return c;
     }
-    @Override public String getType(Uri u) { return "audio/wav"; }
+    @Override public String getType(Uri u) { return String.valueOf(u.getLastPathSegment()).endsWith(".pdf") ? "application/pdf" : "audio/wav"; }
     @Override public Uri insert(Uri u, ContentValues v) { return null; }
     @Override public int delete(Uri u, String s, String[] a) { return 0; }
     @Override public int update(Uri u, ContentValues v, String s, String[] a) { return 0; }

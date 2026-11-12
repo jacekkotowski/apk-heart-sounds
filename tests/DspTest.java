@@ -8,6 +8,10 @@ import java.util.Random;
 public class DspTest {
     static int fails;
     static int argmaxF(float[] v) { int b = 0; for (int i = 0; i < v.length; i++) if (v[i] > v[b]) b = i; return b; }
+    static double jnum(String j, String key) { return jnum(j, key, 0); }
+    static double jnum(String j, String key, int from) { int i = j.indexOf(key, from) + key.length(), e = i; while (e < j.length() && "-.0123456789".indexOf(j.charAt(e)) >= 0) e++; return Double.parseDouble(j.substring(i, e)); }
+    static String between(String j, String a, String b) { int i = j.indexOf(a) + a.length(); return j.substring(i, j.indexOf(b, i)); }
+    static boolean balanced(String j) { int c = 0, q = 0; for (char ch : j.toCharArray()) { if (ch == '{') c++; if (ch == '}') c--; if (ch == '[') q++; if (ch == ']') q--; } return c == 0 && q == 0; }
     static void check(String what, boolean ok) { System.out.println((ok ? "PASS  " : "FAIL  ") + what); if (!ok) fails++; }
 
     /** Gain in dB of the chain without noise reduction for a sine at f. */
@@ -157,6 +161,29 @@ public class DspTest {
         for (int i = 0; i < ak.beatOdd.length; i++) if (ak.beatOdd[i] != 0) { oddKnock++; if (ak.beatOdd[i] == 2 && Math.abs(ak.beatT[i] - 9) < 1) knockAt9 = true; }
         System.out.printf("   unusual beats: plain %d of %d, with knock %d of %d%n", oddPlain, an.beatOdd.length, oddKnock, ak.beatOdd.length);
         check("plain beats have no unusual beat; the knock is marked as a knock and nothing else is", oddPlain == 0 && knockAt9 && oddKnock <= 2);
+        System.out.println("== Report data (synthetic, 60 s)");
+        double[] c6 = beats(4000, 60, 72, 300); float[] rp = new float[c6.length], rm = new float[c6.length], rn = new float[c6.length];
+        for (int i = 0; i < c6.length; i++) { rp[i] = (float) (c6[i] + 6 * R.nextGaussian()); rm[i] = rp[i]; rn[i] = (float) (40 * R.nextGaussian()); }
+        for (int i = 4000 * 9; i < 4000 * 9 + 60; i++) { rp[i] += 15000; rm[i] += 15000; }
+        for (double tb = 0.4; tb < 59.4; tb += 60 / 72.0) for (int i = (int) ((tb + 0.08) * 4000); i < (tb + 0.23) * 4000; i++) rm[i] += 25 * R.nextGaussian() * Math.sin(2 * Math.PI * 300 * i / 4000.0);
+        String recJ = "{\"name\":\"synthetic-60s.wav\",\"date\":\"2026-11-11 16:10\",\"rate\":48000,\"source\":\"unprocessed\",\"mic\":\"bottom\",\"fx\":\"\",\"pos\":\"ll\",\"peak\":15300,\"clipped\":0}";
+        long tRep = System.nanoTime(); Analysis ap = Analysis.run(rp, 4000); String jp = Report.json(rp, 4000, ap, recJ, "test"); double msR = (System.nanoTime() - tRep) / 1e6;
+        Analysis aq = Analysis.run(rm, 4000), ar = Analysis.run(rn, 4000); String jm = Report.json(rm, 4000, aq, recJ, "test"), jn = Report.json(rn, 4000, ar, recJ.replace("\"ll\"", "\"\""), "test");
+        java.nio.file.Files.write(new File(dir, "report_plain.json").toPath(), jp.getBytes()); java.nio.file.Files.write(new File(dir, "report_flag.json").toPath(), jm.getBytes()); java.nio.file.Files.write(new File(dir, "report_none.json").toPath(), jn.getBytes());
+        double stripT = jnum(jp, "\"strip\":{\"t0\":"), sysP = jnum(jp, "\"sysHi\":", jp.indexOf("\"gaps\"")), sysM = jnum(jm, "\"sysHi\":", jm.indexOf("\"gaps\"")), diaP = jnum(jp, "\"diaLo\":", jp.indexOf("\"gaps\""));
+        String sp = jp.substring(jp.indexOf("\"spec\"")); String[] fq = between(sp, "\"f\":[", "]").split(","), lv = between(sp, "\"all\":[", "]").split(","); int pkB = 0; for (int i = 0; i < lv.length; i++) if (Double.parseDouble(lv[i]) > Double.parseDouble(lv[pkB])) pkB = i;
+        int sgC = (int) jnum(jp, "\"sgram\":{\"cols\":"), sgR = (int) jnum(jp, "\"rows\":", jp.indexOf("\"sgram\"")); String sgD = between(jp.substring(jp.indexOf("\"sgram\"")), "\"data\":\"", "\"");
+        int rowsT = between(jp.substring(jp.indexOf("\"beats\":{")), "\"t\":[", "]").split(",").length;
+        System.out.printf("   60 s: analysis and report %.0f ms, %d kB of JSON, strip starts at %.1f s, spectrum peak %s Hz, spectrogram %d x %d, gap after S1 (150-600 Hz) %.1f dB plain and %.1f dB with hiss%n", msR, jp.length() / 1024, stripT, fq[pkB], sgC, sgR, sysP, sysM);
+        check("report JSON has no NaN and balanced brackets", !jp.contains("NaN") && !jn.contains("NaN") && !jp.contains("Infinity") && balanced(jp) && balanced(jm) && balanced(jn));
+        check("quality reads good for beats and weak for noise", jp.contains("\"label\":\"good\"") && jn.contains("\"label\":\"weak\""));
+        check("the 10 s strip avoids the knock at 9 s", stripT > 9.05 || stripT + 10 < 9);
+        check("spectrum peaks where the synthetic heart sounds are (40 to 115 Hz)", Double.parseDouble(fq[pkB]) >= 40 && Double.parseDouble(fq[pkB]) <= 115);
+        check("spectrogram holds cols x rows cells covering 0 to 600 Hz", sgD.length() == sgC * sgR && sgC == 600 && sgR == 39);
+        check("per-beat table has one row per beat and the report repeats rate and flag", rowsT == ap.beatT.length && rowsT > 65 && Math.abs(jnum(jp, "\"why\":\"\",\"rate\":") - 72) < 1 && jp.contains("\"flag\":0") && jm.contains("\"flag\":1"));
+        check("hiss between S1 and S2 raises that gap's level by over 5 dB; quiet gaps sit over 15 dB below the heart sounds", sysM > sysP + 5 && diaP < -15);
+        check("noise only: no rate, no flag, but signal, spectrum and spectrogram are present", jn.contains("\"rate\":null") && jn.contains("\"flag\":-1") && jn.contains("\"strip\":{") && jn.contains("\"spec\":{") && jn.contains("\"sgram\":{") && jn.contains("\"beat\":null"));
+        check("analysis and report for 60 s take under 1 s on this computer", msR < 1000);
         System.out.println("== Raised-pitch playback");
         float[] tone = new float[4000 * 4]; for (int i = 0; i < tone.length; i++) tone[i] = (float) (1000 * Math.sin(2 * Math.PI * 100 * i / 4000.0) * (i % 4000 < 400 ? 1 : 0.05));
         float[] up = Render.shiftUp(tone, 4000, 250);

@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Heart sound report</title>
+<style>
+/* Screen: the app's dark palette. Print: light and ink-saving. One accent for heart sounds, amber only for things that need attention. */
+:root{--bg:#1b2430;--panel:#253141;--line:#3a4a5e;--grid:#33435a;--fg:#edf1f5;--dim:#a2b0c0;--acc:#7cc8a4;--amber:#f0b45a;--mute:#8090a4;
+--mono:ui-monospace,"Roboto Mono","Droid Sans Mono",monospace;--ui:"Roboto Condensed","sans-serif-condensed",Roboto,"Helvetica Neue",Arial,sans-serif;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 var(--ui)}
+#page{max-width:980px;margin:auto;padding:12px 16px 40px}
+h1{font-size:22px;margin:0}h2{font-size:19px;margin:0 0 2px}h3{font-size:15px;margin:0 0 6px;font-weight:600}
+p{margin:0 0 8px}a{color:var(--acc)}
+#top{display:flex;gap:8px;align-items:center;margin-bottom:10px}#top h1{flex:1}
+button{font:inherit;font-weight:600;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;min-height:44px;padding:0 12px}
+button:active{background:var(--line)}button:focus-visible,summary:focus-visible,.spot:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.sub{color:var(--dim);font-size:14px;overflow-wrap:anywhere}
+.not{border:1px solid var(--line);border-radius:4px;padding:6px 10px;color:var(--dim);font-size:13px;margin:10px 0}
+.level{margin-top:22px;border-top:2px solid var(--line);padding-top:12px}
+.lead{color:var(--dim);margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin:0;min-width:0}
+.full{margin-bottom:12px}
+.col{display:contents}.o3{order:3}.o4{order:4}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0}
+.tile .k{color:var(--dim);font-size:13px;line-height:1.2;min-height:2.4em}
+.tile .v{font-size:34px;font-weight:600;line-height:1.15}.tile .u{color:var(--dim);font-size:13px}
+details{font-size:13px}summary{color:var(--dim);cursor:pointer;min-height:28px;display:flex;align-items:center;gap:4px;list-style:none}
+summary::-webkit-details-marker{display:none}summary::before{content:"+";display:inline-block;width:14px;text-align:center;border:1px solid var(--line);border-radius:3px;line-height:14px;font-size:12px}
+details[open]>summary::before{content:"–"}details>div{color:var(--fg);padding:2px 0 6px}
+.how{color:var(--dim);font-size:13px;margin:6px 0 0}.how b{color:var(--fg);font-weight:600}
+.flag{font-size:17px;font-weight:600;display:flex;gap:8px;align-items:flex-start}.flag i{flex:none;width:14px;height:14px;margin-top:5px;border-radius:50%;background:var(--acc)}
+.flag.on i{background:var(--amber);border-radius:2px;transform:rotate(45deg)}.flag.na i{background:none;border:2px solid var(--mute)}
+.caveat{color:var(--dim);font-size:14px;margin:4px 0 0 22px}
+ul{margin:0;padding-left:20px}li{margin-bottom:4px}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th{color:var(--dim);font-weight:600;font-size:13px}
+tr:last-child td{border-bottom:0}
+.scroll{max-height:330px;overflow:auto;border:1px solid var(--line);border-radius:4px}.scroll table{font-size:12px}.scroll td,.scroll th{padding:3px 4px}.scroll th{position:sticky;top:0;background:var(--panel)}
+.warn{color:var(--amber)}
+.box{border-left:3px solid var(--amber);padding:2px 0 2px 10px;font-size:14px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--dim);font-size:12px;margin-bottom:2px}.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend svg{width:18px;height:10px}
+svg.ch{display:block;width:100%;height:auto;touch-action:pan-y;font-family:var(--ui)}
+svg text{fill:var(--dim);font-size:10px}svg text.lbl{fill:var(--fg);font-weight:600}
+.ax{stroke:var(--line);stroke-width:1;fill:none}.gr{stroke:var(--grid);stroke-width:1;fill:none}.grm{stroke:var(--grid);stroke-width:.5;fill:none;opacity:.55}
+.ln{stroke:var(--acc);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.ln.thin{stroke-width:.7;opacity:.3}
+.fill{fill:var(--acc);stroke:none}.band{fill:var(--acc);opacity:.22;stroke:none}.wash{fill:var(--acc);opacity:.14;stroke:none}
+.mu{stroke:var(--mute);stroke-width:1.5;fill:none;stroke-linejoin:round}.muf{fill:var(--mute)}
+.dot{fill:var(--acc);stroke:var(--panel);stroke-width:1.5}.odd{fill:var(--amber);stroke:var(--panel);stroke-width:1.5}.oddl{stroke:var(--amber);stroke-width:1.1;fill:none;opacity:.9}
+.tk{stroke:var(--acc);stroke-width:1}.cross{stroke:var(--fg);stroke-width:1;opacity:0;pointer-events:none}
+.brk{stroke:var(--dim);stroke-width:1;fill:none}
+#tip{position:fixed;z-index:9;pointer-events:none;background:#0f151d;border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--fg);max-width:220px;display:none}
+#tip b{display:block;font-size:13px}
+.spot{fill:var(--panel);stroke:var(--dim);stroke-width:1.5;cursor:pointer}.spot.sel{fill:var(--acc);stroke:var(--acc)}
+.body{stroke:var(--mute);stroke-width:1.5;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.cond{display:flex;gap:12px;align-items:flex-start}.cond svg{flex:none;width:112px}.cond dl{flex:1;min-width:0}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:14px}dt{color:var(--dim)}dd{margin:0;overflow-wrap:anywhere}
+.btns{display:flex;gap:8px;flex-wrap:wrap}.btns button{flex:1 1 auto}
+.primer{display:grid;grid-template-columns:1fr;gap:12px}.primer .card{display:flex;gap:10px;align-items:flex-start}.primer svg{flex:none;width:92px;height:auto}.primer p{font-size:14px;margin:0}
+.imgd{display:block}.imgp{display:none}.po{display:none}
+#msg{color:var(--amber);min-height:20px;font-size:14px;margin-top:6px;overflow-wrap:anywhere}
+#load{padding:40px 0;text-align:center;color:var(--dim)}
+[hidden]{display:none!important}
+@media (min-width:700px){.col{min-width:0;display:flex;flex-direction:column;gap:12px}.grid2{grid-template-columns:1fr 1fr}.primer{grid-template-columns:1fr 1fr}.tile .k{min-height:0}}
+@media print{
+ :root{--bg:#fff;--panel:#fff;--line:#b8bfc7;--grid:#d5dae0;--fg:#111;--dim:#444;--acc:#0a7d5a;--amber:#b85e00;--mute:#777;color-scheme:light}
+ @page{size:A4;margin:9mm 12mm}
+ html,body{font-size:9.3pt;line-height:1.28;background:#fff}#page{max-width:none;padding:0}
+ .np,#tip,summary::before{display:none!important}
+ .tile details:not([open]){display:none}
+ h1{font-size:15pt}h2{font-size:12.5pt}h3{font-size:10pt;margin-bottom:3px}
+ .level{break-before:page;margin-top:0;border-top:0;padding-top:0}#l1{break-before:auto;margin-top:8px}
+ .grid2{display:block;column-count:2;column-gap:7px;margin-bottom:0}.grid2>.card{margin-bottom:7px}.grid2.cols{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}.col{min-width:0;display:flex;flex-direction:column;gap:7px}.primer{grid-template-columns:1fr 1fr;gap:7px}
+ .card,.tile{break-inside:avoid;padding:5px 8px;border-radius:3px}.full{margin-bottom:7px}
+ th,td{padding:2px 5px}summary{min-height:0}
+ .tile .v{font-size:24pt}.tile .k{min-height:0}.tile .k,.tile .u,.how,.sub,th,.legend,.caveat,.box,dl,table,.primer p{font-size:8.4pt}
+ .box p{display:inline}.how{margin-top:3px}.lead{margin-bottom:6px}.flag{font-size:11pt}
+ .scroll{max-height:none;overflow:visible;border:0}.so{display:none}.po{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.po table{font-size:6.6pt}.po td,.po th{padding:1px 3px;font-size:6.6pt;white-space:nowrap}
+ .imgd{display:none}.imgp{display:block}
+ .primer svg{width:64px}.cond svg{width:74px}.how{font-size:8pt}
+ #primer{break-before:auto;margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+}
+</style></head><body>
+<div id="page">
+  <div id="top"><button id="back" class="np" aria-label="Back to recordings">‹ Back</button><h1>Heart sound report</h1><button id="pdf" class="np">PDF</button></div>
+  <div id="load">Preparing the report…</div>
+  <div id="pick" hidden class="card"><p>Open a report file (JSON) saved from Heart Sounds.</p><input type="file" id="file" accept=".json,application/json"></div>
+  <div id="msg" class="np" role="status"></div>
+  <div id="rep" hidden></div>
+</div>
+<div id="tip"></div>
+<script>
+"use strict";
+// The page draws one JSON object (see Report.java). It needs no app: window.REPORT_DATA or a picked file works in any browser.
+// Inside the app, an optional window.ReportHost supplies the data and handles saving, printing and the chest position.
+const $ = id => document.getElementById(id), host = window.ReportHost || null;
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fx = (v, d) => v == null || isNaN(v) ? "–" : v.toFixed(d === undefined ? 1 : d);
+const sg = (v, d) => v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d === undefined ? 1 : d);
+const clock = t => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0");
+const path = pts => pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+const median = a => { if (!a.length) return null; const c = a.slice().sort((x, y) => x - y); return c[Math.round(0.5 * (c.length - 1))]; };
+const say = t => { $("msg").textContent = t || ""; };
+const ODD = ["", "timing", "knock or loud noise", "different shape"], ODD_S = ["", "timing", "knock", "shape"];
+const SPOTS = { ur: ["Upper right of the breastbone", "aortic area", 47, 50], ul: ["Upper left of the breastbone", "pulmonary area", 73, 50], ll: ["Lower left of the breastbone", "tricuspid area", 71, 80], apex: ["Lower left chest, below the nipple", "apex, mitral area", 90, 93] };
+let D = null, wide = false, printing = false;
+
+// ---------- charts: each returns {html, probe}; probe(x, y) in drawing units gives the tooltip for that spot ----------
+const svg = (w, h, label, inner) => `<svg class="ch" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label)}">${inner}<line class="cross" x1="0" y1="0" x2="0" y2="0"/></svg>`;
+const txt = (x, y, s, anchor, cls) => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${anchor ? ` text-anchor="${anchor}"` : ""}${cls ? ` class="${cls}"` : ""}>${esc(s)}</text>`;
+const vline = (x, y0, y1, cls) => `<line class="${cls}" x1="${x.toFixed(1)}" y1="${y0}" x2="${x.toFixed(1)}" y2="${y1}"/>`;
+const hline = (y, x0, x1, cls) => `<line class="${cls}" x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}"/>`;
+const diamond = (x, y, r, cls) => `<path class="${cls}" d="M${x.toFixed(1)} ${(y - r).toFixed(1)}l${r} ${r}l${-r} ${r}l${-r} ${-r}z"/>`;
+
+/** One panel of the typical beat: middle line and middle-half band. */
+function beatPanel(b, band, x0, x1, y0, y1) {
+  const s = b[band], n = s.mid.length, total = (n - 1) * b.step, top = Math.max(...s.q3, 1e-6) * 1.1;
+  const X = t => x0 + (t + b.pre) / total * (x1 - x0), Y = v => y1 - Math.min(1, v / top) * (y1 - y0), T = i => i * b.step - b.pre;
+  let g = "";
+  for (let t = -0.1; t < total - b.pre + 1e-6; t += 0.1) g += vline(X(t), y0, y1, "gr");
+  g += `<path class="band" d="${path(s.q3.map((v, i) => [X(T(i)), Y(v)]))}${path(s.q1.map((v, i) => [X(T(i)), Y(v)]).reverse()).replace("M", "L")}z"/>`;
+  g += `<path class="ln" d="${path(s.mid.map((v, i) => [X(T(i)), Y(v)]))}"/>` + hline(y1, x0, x1, "ax");
+  return { g, X, Y, T, total, top, n };
+}
+function beatSimple(b) {
+  const W = 360, H = 176, p = beatPanel(b, "lo", 6, 354, 10, 108); let g = p.g;
+  const marks = [[0, "S1"], [b.s1s2, "S2"], [b.cycle, "S1"]];
+  for (const [t, l] of marks) g += txt(p.X(t), 124, l, "middle", "lbl");
+  const br = (ta, tb, l1, l2) => { const a = p.X(ta) + 9, c = p.X(tb) - 9, m = (a + c) / 2; return `<path class="brk" d="M${a.toFixed(1)} 131v6H${c.toFixed(1)}v-6"/>` + txt(m, 151, l1, "middle", "lbl") + txt(m, 164, l2, "middle"); };
+  g += br(0, b.s1s2, "gap 1 · " + fx(b.s1s2, 2) + " s", "squeeze (systole)") + br(b.s1s2, b.cycle, "gap 2 · " + fx(b.cycle - b.s1s2, 2) + " s", "refill (diastole)");
+  return { html: svg(W, H, "Typical beat with the first and second heart sound and the two gaps", g), probe: (x) => { const i = Math.max(0, Math.min(p.n - 1, Math.round((x - 6) / 348 * (p.n - 1)))); return { x: p.X(p.T(i)), y0: 10, y1: 108, head: fx(p.T(i), 2) + " s from S1", rows: ["loudness " + fx(b.lo.mid[i], 0) + " (middle half " + fx(b.lo.q1[i], 0) + "–" + fx(b.lo.q3[i], 0) + ")"] }; } };
+}
+function beatBands(b) {
+  const W = 360, H = 206, a = beatPanel(b, "lo", 30, 354, 14, 76), c = beatPanel(b, "hi", 30, 354, 116, 178); let g = a.g + c.g;
+  g += txt(32, 11, "40–200 Hz · heart sounds") + txt(32, 112, "150–600 Hz · where murmurs tend to show");
+  for (const p of [a, c]) g += txt(26, p.Y(p.top / 1.1) + 3, fx(p.top / 1.1, p.top < 20 ? 1 : 0), "end") + txt(26, p.Y(0), "0", "end");
+  for (let t = 0; t < a.total - b.pre + 1e-6; t += 0.2) g += txt(a.X(t), 191, fx(t, 1), a.X(t) > 344 ? "end" : "middle");
+  g += txt(354, 203, "seconds from S1", "end");
+  for (const [t, l] of [[0, "S1"], [b.s1s2, "S2"], [b.cycle, "S1"]]) g += vline(a.X(t), 78, 82, "tk") + txt(a.X(t), 92, l, "middle", "lbl");
+  return { html: svg(W, H, "Typical beat in two frequency bands", g), probe: (x) => { const i = Math.max(0, Math.min(a.n - 1, Math.round((x - 30) / 324 * (a.n - 1)))); return { x: a.X(a.T(i)), y0: 14, y1: 178, head: fx(a.T(i), 2) + " s from S1", rows: ["40–200 Hz: " + fx(b.lo.mid[i], 1), "150–600 Hz: " + fx(b.hi.mid[i], 2)] }; } };
+}
+/** Sound trace of the cleanest 10 seconds in rows of 5 s, on a 0.2 s / 0.04 s grid, with S1 and S2 on every beat. */
+function strip(d) {
+  const s = d.strip, n = s.min.length, dur = n * s.step, per = 5, rows = Math.max(1, Math.ceil(dur / per - 1e-9)), W = wide ? 720 : 360, rh = wide ? 58 : 74, x0 = 4, x1 = W - 4, H = rows * (rh + 26) + 2;
+  let g = "";
+  for (let r = 0; r < rows; r++) {
+    const top = r * (rh + 26) + 12, bot = top + rh, mid = (top + bot) / 2, ta = r * per, X = t => x0 + (t - ta) / per * (x1 - x0), Y = v => mid - v / 1000 * (rh / 2 - 2);
+    for (let i = 0; i <= per * 25; i++) { const x = X(ta + i * 0.04); g += vline(x, top, bot, i % 5 ? "grm" : "gr"); }
+    for (let i = 0; i <= per; i++) g += txt(X(ta + i), bot + 11, clock(s.t0 + ta + i) + (i === 0 ? " min:s" : ""), i === 0 ? "start" : i === per ? "end" : "middle");
+    g += hline(mid, x0, x1, "ax");
+    const a = Math.round(ta / s.step), b = Math.min(n, Math.round((ta + per) / s.step)); if (b <= a) continue;
+    let up = "", dn = "";
+    for (let i = a; i < b; i++) { const x = X(i * s.step + s.step / 2).toFixed(1); up += (i === a ? "M" : "L") + x + " " + Y(s.max[i]).toFixed(1); dn = "L" + x + " " + Y(s.min[i]).toFixed(1) + dn; }
+    g += `<path class="fill" d="${up}${dn}z"/>`;
+    for (const [arr, l] of [[d.marks.s1, "S1"], [d.marks.s2, "S2"]]) for (const t of arr) { const u = t - s.t0 - 0.025; if (u < ta || u >= ta + per || u > dur) continue; g += vline(X(u), top - 3, top + 3, "tk") + txt(X(u), top - 4, l, "middle", l === "S1" ? "lbl" : ""); }
+  }
+  return { html: svg(W, H, "Sound trace of the cleanest 10 seconds with first and second heart sounds marked", g), probe: (x, y) => { const r = Math.max(0, Math.min(rows - 1, Math.floor(y / (rh + 26)))), t = r * per + (Math.max(x0, Math.min(x1, x)) - x0) / (x1 - x0) * per, top = r * (rh + 26) + 12; return { x: Math.max(x0, Math.min(x1, x)), y0: top, y1: top + rh, head: fx(s.t0 + t, 2) + " s into the recording", rows: [] }; } };
+}
+/** Whole recording: loudness on top, one mark per beat below. */
+function rhythm(d) {
+  const W = wide ? 720 : 360, x0 = 30, x1 = W - 6, X = t => x0 + t / d.seconds * (x1 - x0), o = d.over, b = d.beats, rel = d.a.reliable; let g = "", pts = [];
+  const oy0 = 12, oy1 = wide ? 36 : 46;
+  if (o) { let p = `M${X(o.t0).toFixed(1)} ${oy1}`; o.v.forEach((v, i) => { p += "L" + X(o.t0 + (i + 0.5) * o.step).toFixed(1) + " " + (oy1 - v / 1000 * (oy1 - oy0)).toFixed(1); }); g += `<path class="wash" d="${p}L${X(o.t0 + o.v.length * o.step).toFixed(1)} ${oy1}z"/><path class="ln" style="stroke-width:1" d="${p.replace(/^M[^L]*L/, "M")}"/>`; }
+  g += txt(x0, 9, "loudness, 40–200 Hz") + hline(oy1, x0, x1, "ax");
+  const y0 = oy1 + 16, y1 = wide ? 98 : 132, H = rel ? y1 + 18 : 66;
+  const step = d.seconds <= 20 ? 2 : d.seconds <= 45 ? 5 : d.seconds <= 120 ? 10 : 30;
+  for (let t = 0; t <= d.seconds; t += step) g += vline(X(t), oy1, oy1 + 3, "ax") + (rel ? vline(X(t), y0, y1, "gr") : "") + txt(X(t), (rel ? y1 : oy1) + 13, clock(t), X(t) > x1 - 12 ? "end" : "middle");
+  if (rel) {
+    const rates = b.len.map(l => l > 0 ? 60 / l : null), med = d.a.rate, lo = Math.max(0, Math.min(med * 0.75, ...rates.filter(v => v !== null && v > med * 0.5))), hi = Math.max(med * 1.25, ...rates.filter(v => v !== null && v < med * 1.6)), Y = r => y1 - (Math.max(lo, Math.min(hi, r)) - lo) / (hi - lo) * (y1 - y0);
+    g += hline(Y(med), x0, x1, "ax") + txt(x0 - 4, Y(med) + 3, fx(med, 0), "end") + txt(x0 - 4, y0 + 6, fx(hi, 0), "end") + txt(x0 - 4, y1, fx(lo, 0), "end") + txt(x0, y0 - 4, "beats per minute, beat by beat");
+    let k = 0, later = "";
+    b.t.forEach((t, i) => {
+      const y = rates[i] === null ? Y(med) : Y(rates[i]);
+      if (b.odd[i]) { k++; later += diamond(X(t), y, 5, "odd") + txt(X(t), y - 8, String(k), "middle", "lbl"); pts.push([X(t), y, clock(t) + " · unusual beat " + k, [ODD[b.odd[i]], rates[i] === null ? "length not measured" : fx(rates[i], 0) + " per minute"]]); }
+      else if (rates[i] !== null) { g += `<circle class="dot" cx="${X(t).toFixed(1)}" cy="${y.toFixed(1)}" r="3"/>`; pts.push([X(t), y, clock(t), [fx(rates[i], 0) + " per minute", "beat length " + fx(b.len[i], 2) + " s"]]); }
+    });
+    g += later;
+  } else for (const t of d.marks.s1) g += vline(X(t), oy1 - 5, oy1, "mu");
+  return { html: svg(W, H, "Rhythm of the whole recording, one mark per beat", g), probe: (x, y) => { let best = null, bd = 1e9; for (const p of pts) { const q = Math.abs(p[0] - x) + 0.3 * Math.abs(p[1] - y); if (q < bd) { bd = q; best = p; } } return best && bd < 40 ? { x: best[0], y0: y0, y1: y1, head: best[2], rows: best[3] } : null; } };
+}
+/** Spectrogram as two small images (screen and print colours) inside the drawing, 0 to 600 Hz. */
+function sgram(d) {
+  const s = d.sgram, W = wide ? 720 : 360, x0 = 30, x1 = W - 6, y0 = 14, y1 = 134, H = 150, fTop = (s.rows - 1) * s.df, B = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const img = (ramp) => { const c = document.createElement("canvas"); c.width = s.cols; c.height = s.rows; const g = c.getContext("2d"), im = g.createImageData(s.cols, s.rows); for (let r = 0; r < s.rows; r++) for (let k = 0; k < s.cols; k++) { const v = B.indexOf(s.data[r * s.cols + k]) / 63, q = ramp(v), o = ((s.rows - 1 - r) * s.cols + k) * 4; im.data[o] = q[0]; im.data[o + 1] = q[1]; im.data[o + 2] = q[2]; im.data[o + 3] = 255; } g.putImageData(im, 0, 0); return c.toDataURL(); };
+  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t)), two = (a, b, c) => v => v < 0.6 ? mix(a, b, v / 0.6) : mix(b, c, (v - 0.6) / 0.4);
+  const im = (cls, src) => `<image class="${cls}" x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" preserveAspectRatio="none" style="image-rendering:pixelated" href="${src}"/>`;
+  let g = im("imgd", img(two([27, 36, 48], [86, 160, 128], [236, 255, 246]))) + im("imgp", img(two([255, 255, 255], [120, 180, 160], [6, 60, 44])));
+  const X = t => x0 + (t - s.t0) / (s.cols * s.dt) * (x1 - x0), Y = f => y1 - f / (fTop + s.df / 2) * (y1 - y0);
+  for (const f of [0, 200, 400, 600]) g += txt(x0 - 4, Y(f) + 3, String(f), "end") + hline(Y(f), x0 - 3, x0, "ax");
+  g += txt(x0, 9, "Hz"); const step = d.seconds <= 20 ? 2 : d.seconds <= 45 ? 5 : d.seconds <= 120 ? 10 : 30;
+  for (let t = step; t <= d.seconds; t += step) g += vline(X(t), y1, y1 + 3, "ax") + txt(X(t), y1 + 13, clock(t), X(t) > x1 - 12 ? "end" : "middle");
+  for (const t of d.marks.s1) if (t >= s.t0) g += vline(X(t), y0 - 5, y0 - 1, "tk");
+  return { html: svg(W, H, "Spectrogram of the whole recording from 0 to 600 Hz", g), probe: (x, y) => { const cx = Math.max(x0, Math.min(x1, x)), k = Math.min(s.cols - 1, Math.floor((cx - x0) / (x1 - x0) * s.cols)), r = Math.max(0, Math.min(s.rows - 1, Math.round((y1 - y) / (y1 - y0) * (fTop + s.df / 2) / s.df))); return { x: cx, y0, y1, head: fx(s.t0 + (k + 0.5) * s.dt, 1) + " s · " + fx(r * s.df, 0) + " Hz", rows: [fx((B.indexOf(s.data[r * s.cols + k]) / 63 - 1) * s.rangeDb, 0) + " dB against the top of the scale"] }; } };
+}
+function spectrum(d) {
+  const s = d.spec, W = 360, H = 190, x0 = 30, x1 = 352, y0 = 10, y1 = 160, fa = Math.max(8, s.f[0]), fb = 1000;
+  const hiV = Math.ceil(Math.max(...s.all, ...s.quiet) / 10) * 10, loV = hiV - 70, X = f => x0 + Math.log(f / fa) / Math.log(fb / fa) * (x1 - x0), Y = v => y1 - (Math.max(loV, Math.min(hiV, v)) - loV) / (hiV - loV) * (y1 - y0);
+  let g = "";
+  for (let v = loV; v <= hiV; v += 10) g += hline(Y(v), x0, x1, "gr") + ((v - loV) % 20 === 0 ? txt(x0 - 4, Y(v) + 3, String(v), "end") : "");
+  for (const f of [10, 20, 50, 100, 200, 500, 1000]) g += vline(X(f), y0, y1, "gr") + txt(X(f), y1 + 12, String(f), f === 1000 ? "end" : "middle");
+  g += txt(x1, y1 + 25, "Hz (each step to the right is a higher pitch)", "end") + txt(x0, y0 - 2, "dB");
+  const line = a => path(s.f.map((f, i) => [X(Math.max(fa, f)), Y(a[i])]));
+  g += `<path class="mu" d="${line(s.quiet)}"/><path class="ln" d="${line(s.all)}"/>`;
+  return { html: svg(W, H, "Average spectrum of the recording and of its quietest quarter", g), probe: (x) => { const f = fa * Math.pow(fb / fa, (Math.max(x0, Math.min(x1, x)) - x0) / (x1 - x0)); let i = 0; s.f.forEach((v, k) => { if (Math.abs(v - f) < Math.abs(s.f[i] - f)) i = k; }); return { x: X(Math.max(fa, s.f[i])), y0, y1, head: fx(s.f[i], 0) + " Hz", rows: ["whole recording " + fx(s.all[i], 0) + " dB", "quietest quarter " + fx(s.quiet[i], 0) + " dB"] }; } };
+}
+function histogram(d) {
+  const len = d.beats.len.filter(v => v > 0), W = 360, H = 170, x0 = 30, x1 = 352, y0 = 12, y1 = 132, bw = 0.02;
+  const lo = Math.floor(Math.min(...len) / bw) * bw - bw, hi = Math.ceil(Math.max(...len) / bw) * bw + bw, nb = Math.max(1, Math.round((hi - lo) / bw)), c = new Array(nb).fill(0);
+  for (const v of len) c[Math.min(nb - 1, Math.floor((v - lo) / bw + 1e-9))]++;
+  const top = Math.max(...c), X = v => x0 + (v - lo) / (hi - lo) * (x1 - x0), Y = v => y1 - v / top * (y1 - y0), slot = (x1 - x0) / nb, w = Math.max(1, Math.min(24, slot - 2));
+  let g = ""; const yt = top <= 4 ? 1 : Math.ceil(top / 4);
+  for (let v = 0; v <= top; v += yt) g += hline(Y(v), x0, x1, v ? "gr" : "ax") + txt(x0 - 4, Y(v) + 3, String(v), "end");
+  const bars = []; c.forEach((v, i) => { if (!v) return; const x = X(lo + (i + 0.5) * bw) - w / 2, y = Y(v), r = Math.min(4, w / 2, (y1 - y)); g += `<path class="fill" d="M${x.toFixed(1)} ${y1}V${(y + r).toFixed(1)}q0 ${-r} ${r} ${-r}h${(w - 2 * r).toFixed(1)}q${r} 0 ${r} ${r}V${y1}z"/>`; bars.push([x + w / 2, lo + i * bw, v]); });
+  const ts = (hi - lo) > 0.5 ? 0.2 : (hi - lo) > 0.24 ? 0.1 : 0.04;
+  for (let v = Math.ceil(lo / ts - 1e-9) * ts; v <= hi + 1e-9; v += ts) g += vline(X(v), y1, y1 + 3, "ax") + txt(X(v), y1 + 13, fx(v, 2), "middle");
+  g += txt(x1, y1 + 27, "beat length, seconds", "end") + txt(x0, y0 - 3, "beats");
+  return { html: svg(W, H, "Histogram of beat lengths", g), probe: (x) => { let b = null; for (const q of bars) if (!b || Math.abs(q[0] - x) < Math.abs(b[0] - x)) b = q; return b ? { x: b[0], y0, y1, head: fx(b[1], 2) + "–" + fx(b[1] + bw, 2) + " s", rows: [b[2] + (b[2] === 1 ? " beat" : " beats")] } : null; } };
+}
+function poincare(d) {
+  const b = d.beats, pr = []; for (let i = 0; i + 1 < b.len.length; i++) if (b.len[i] > 0 && b.len[i + 1] > 0) pr.push([b.len[i], b.len[i + 1], b.odd[i] || b.odd[i + 1], b.t[i]]);
+  const W = 360, H = 190, s = 150, x0 = 100, y0 = 8, x1 = x0 + s, y1 = y0 + s, all = pr.flatMap(p => [p[0], p[1]]), lo = Math.min(...all) - 0.04, hi = Math.max(...all) + 0.04, X = v => x0 + (v - lo) / (hi - lo) * s, Y = v => y1 - (v - lo) / (hi - lo) * s;
+  let g = `<rect class="ax" x="${x0}" y="${y0}" width="${s}" height="${s}"/><line class="gr" x1="${x0}" y1="${y1}" x2="${x1}" y2="${y0}"/>`;
+  const ts = (hi - lo) > 0.6 ? 0.2 : (hi - lo) > 0.25 ? 0.1 : 0.05;
+  for (let v = Math.ceil(lo / ts) * ts; v <= hi; v += ts) g += txt(X(v), y1 + 12, fx(v, 2), "middle") + txt(x0 - 4, Y(v) + 3, fx(v, 2), "end") + vline(X(v), y1, y1 + 3, "ax") + hline(Y(v), x0 - 3, x0, "ax");
+  g += txt(x1, y1 + 25, "this beat, s", "end") + txt(x0 - 34, y0 + 8, "next beat, s", "end");
+  let odd = ""; for (const p of pr) if (p[2]) odd += diamond(X(p[0]), Y(p[1]), 4.5, "odd"); else g += `<circle class="dot" cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="3"/>`;
+  return { html: svg(W, H, "Each beat length against the next", g + odd), probe: (x, y) => { let best = null, bd = 1e9; for (const p of pr) { const q = Math.hypot(X(p[0]) - x, Y(p[1]) - y); if (q < bd) { bd = q; best = p; } } return best && bd < 30 ? { x: X(best[0]), y0, y1, head: clock(best[3]), rows: ["this beat " + fx(best[0], 2) + " s", "next beat " + fx(best[1], 2) + " s"].concat(best[2] ? ["unusual beat"] : []) } : null; } };
+}
+function overlay(d) {
+  const o = d.overlay, W = 360, H = 150, x0 = 6, x1 = 354, y0 = 8, y1 = 118, n = o.rows[0].length, total = (n - 1) * o.step, X = i => x0 + i / (n - 1) * (x1 - x0), Y = v => y1 - v / 1000 * (y1 - y0), T = t => x0 + (t + o.pre) / total * (x1 - x0);
+  let g = "", odd = "";
+  for (let t = -0.1; t < total - o.pre + 1e-6; t += 0.1) g += vline(T(t), y0, y1, "gr");
+  o.rows.forEach((r, k) => { const p = `<path class="${o.odd[k] ? "oddl" : "ln thin"}" d="${path(r.map((v, i) => [X(i), Y(v)]))}"/>`; if (o.odd[k]) odd += p; else g += p; });
+  g += odd + hline(y1, x0, x1, "ax");
+  for (let t = 0; t < total - o.pre + 1e-6; t += 0.2) g += txt(T(t), y1 + 12, fx(t, 1), T(t) > x1 - 10 ? "end" : "middle");
+  g += txt(x1, y1 + 26, "seconds from S1", "end");
+  return { html: svg(W, H, "All beats overlaid, lined up on the first heart sound", g), probe: null };
+}
+function chest(pos, pick) {
+  let g = `<path class="body" d="M50 4v9q0 8-13 11l-15 4q-12 4-12 18v80M70 4v9q0 8 13 11l15 4q12 4 12 18v80"/><path class="body" style="stroke-width:1" d="M60 32v64M36 36q12 5 24 1q12 4 24-1M34 100q13 9 26-2q13 11 26 2"/>`;
+  for (const k in SPOTS) { const s = SPOTS[k]; g += `<circle class="spot${pos === k ? " sel" : ""}" data-pos="${k}" cx="${s[2]}" cy="${s[3]}" r="8"${pick ? ' tabindex="0" role="button"' : ""}><title>${esc(s[0])}</title></circle>`; }
+  return `<svg viewBox="0 0 120 132" role="img" aria-label="Chest seen from the front with four listening spots">${g}<text x="4" y="12" style="font-size:9px">right</text><text x="116" y="12" text-anchor="end" style="font-size:9px">left</text></svg>`;
+}
+
+// ---------- page ----------
+const how = t => `<p class="how"><b>How to read this.</b> ${t}</p>`;
+const more = (label, text) => `<details><summary>${label}</summary><div>${text}</div></details>`;
+const card = (id, title, howText, extra) => `<figure class="card"><h3>${title}</h3>${extra || ""}<div id="${id}"></div>${howText ? how(howText) : ""}</figure>`;
+const tile = (k, v, u, text) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="u">${u}</div>${more("Explain", text)}</div>`;
+const QUAL = { good: "good, clear beats", fair: "fair", weak: "weak, no clear beats" };
+
+function build() {
+  const d = D, a = d.a, r = d.rec || {}, q = d.quality, rel = a.reliable, b = d.beat, G = d.gaps, nb = d.beats.t.length, nOdd = d.beats.odd.filter(Boolean).length;
+  const name = String(r.name || "recording").replace(/\.wav$/, "");
+  let h = `<p class="sub"><b>${esc(name)}</b> · ${r.date ? "recorded " + esc(r.date) + " · " : ""}${fx(d.seconds, 0)} s · signal ${!q ? "not measured" : rel ? QUAL[q.label] : "unclear, beats not found reliably"}</p>
+<div class="not">This report describes sounds picked up by a phone microphone. It is not an ECG and not a diagnosis.</div>`;
+
+  // Level 1
+  h += `<section class="level" id="l1"><h2>1 · At a glance</h2><p class="lead">The recording in plain words: how fast, how regular, and whether an extra sound was picked up.</p>`;
+  if (!rel) h += `<div class="card full"><p class="warn"><b>The beats were not found reliably: ${esc(a.why || "no beats found")}.</b></p><p>No heart rate or timing is given, because a number that was not measured would mislead. The signal, its spectrum and tips for a better recording are below.</p></div>`;
+  h += `<div class="tiles">`
+    + tile("Heart rate", rel ? fx(a.rate, 0) : "–", rel ? "beats per minute" : "not measured", "How many beats per minute, from the usual time between beats in this recording. For adults at rest, 60 to 100 is the usual range. It tells you the pace, not how well the heart pumps.")
+    + tile("First to second sound", rel ? fx(a.s1s2, 2) : "–", rel ? "seconds" : "not measured", "The time from the first heart sound (S1, “lub”) to the second (S2, “dub”), while the heart pushes blood out. Around 0.3 s is common at rest; it shortens as the heart speeds up. No range has been established for phone recordings.")
+    + tile("Clean beats", nb || rel ? fx(a.found * 100, 0) + "%" : "–", nb || rel ? "both sounds found" : "no beats found", "The share of beats in which both heart sounds were found. Below 60% the report gives no rate or timing. A low share usually means noise, movement or a poor spot. It does not mean a heart problem.")
+    + `</div><div class="grid2">`;
+  if (rel && b) h += card("c_beat", "Your typical beat", "Time runs left to right and height is loudness. Each beat makes two sounds: S1 when the heart starts to squeeze, S2 when it relaxes. The heart pushes blood out during gap 1 and refills during gap 2. In most hearts gap 1 is the shorter one and both gaps are quiet. The shaded band shows how much the beats vary. This is a sound picture, so it cannot show the heart’s electrical rhythm.");
+  else h += card("c_over1", "The signal", "Loudness over the whole recording, left to right. Clear, evenly spaced spikes would be heartbeats. An uneven or flat line means the microphone picked up mostly noise or movement.");
+  const fl = a.flag;
+  h += `<div class="card"><h3>Extra sound between the heart sounds</h3>
+<div class="flag ${fl === 1 ? "on" : fl === 0 ? "" : "na"}"><i></i><span>${fl === 1 ? "A murmur-like sound was picked up between the first and second heart sound." : fl === 0 ? "No murmur-like sound was picked up between the first and second heart sound." : "The check for a murmur-like sound could not be done on this recording."}</span></div>
+<p class="caveat">${fl === 1 ? "This can be a murmur. It can also be breathing, rubbing or room noise, and many murmurs are harmless. Only a doctor listening with a stethoscope can tell." : fl === 0 ? "This does not rule out a murmur or any heart condition. On stethoscope recordings the check missed about 4 in 10 murmurs." : "The beats were not found reliably, so there is nothing to say either way."} The check is experimental: it was tested on stethoscope recordings of children, not on phones or adults.</p>
+<h3 style="margin-top:12px">What to do with this</h3><ul><li>Record again in the same spot and compare. Something that repeats means more than something seen once.</li><li>If you have symptoms such as chest pain, breathlessness, fainting or a racing heart, see a doctor whatever this report says.</li><li>You can show this report to a doctor, but it does not replace an examination.</li></ul></div></div></section>`;
+
+  // Level 2
+  h += `<section class="level" id="l2"><h2>2 · Clinical view</h2><p class="lead">For a clinician: timing, rhythm and sound levels, measured from sound alone. No electrical signal was recorded.</p>`;
+  if (d.strip) h += `<div class="full">` + card("c_strip", "Sound trace of the cleanest " + fx(Math.min(10, d.strip.min.length * d.strip.step), 0) + " seconds (phonocardiogram), " + d.strip.band[0] + "–" + d.strip.band[1] + " Hz", "Time runs left to right in rows of 5 s. Heavy lines are 0.2 s apart, fine lines 0.04 s." + (rel ? " Each beat should show two bursts, marked S1 and S2." : " Beats were not found reliably, so no marks are shown.") + " Height is sound pressure in arbitrary units, scaled to this stretch. It is not a voltage and this is not an ECG.") + `</div>`;
+  let oddList = ""; if (rel && nOdd) { let k = 0; const it = []; d.beats.odd.forEach((o, i) => { if (o) it.push(++k + " · " + clock(d.beats.t[i]) + " " + ODD[o]); }); oddList = `<p class="how">Unusual beats: ${esc(it.slice(0, 14).join("; "))}${it.length > 14 ? "; … (all in the per-beat table)" : ""}.</p>`; }
+  h += `<div class="full"><figure class="card"><h3>Rhythm of the whole recording</h3>${rel ? `<div class="legend"><span><svg viewBox="0 0 18 10"><circle class="dot" cx="9" cy="5" r="3.5"/></svg>beat</span><span><svg viewBox="0 0 18 10"><path class="odd" d="M9 0l5 5l-5 5l-5-5z"/></svg>unusual beat (numbered)</span></div>` : ""}<div id="c_rhythm"></div>${oddList}`
+    + how(rel ? "Each dot is one beat; its height is the rate that beat’s length corresponds to. A level row of dots is a steady rhythm; a slow wave is usually breathing. Diamonds are beats that differ from this recording’s own typical beat, most often a knock or movement. Sound alone cannot classify a rhythm." : "Loudness over the whole recording. Grey ticks are places where a beat may be, but they were not reliable enough to measure.") + `</figure></div><div class="grid2 cols"><div class="col">`;
+  if (b) h += card("c_bands", "Typical beat in two frequency bands", "Beats are lined up on S1. Line: middle value. Band: middle half of beats. A hump between S1 and S2 in the lower panel is what the murmur-like-sound flag looks for. Each panel has its own height scale, so compare shapes, not heights." + (rel ? "" : " Beats were not found reliably, so treat this picture with caution."));
+  const row = (k, v, text) => `<tr><td>${more(k, text)}</td><td class="n">${v}</td></tr>`, nm = "not measured";
+  h += `<div class="card o4"><h3>Recording conditions</h3><div class="cond"><div id="c_chest"></div><dl>
+<dt>Position</dt><dd id="posname"></dd>
+<dt>Microphone</dt><dd>${esc(r.mic || "not recorded")}</dd>
+<dt>Audio source</dt><dd>${esc(r.source || "not recorded")}${r.fx ? " · " + esc(r.fx) : ""}</dd>
+<dt>Sample rate</dt><dd>${r.rate ? fx(r.rate / 1000, 1) + " kHz, 16-bit, raw" : "not recorded"}</dd>
+<dt>Clipping</dt><dd>${r.clipped == null ? "not checked" : r.clipped > 0 ? `<span class="warn">${r.clipped} samples at full scale</span>` : "none"}${r.peak ? " · peak " + fx(20 * Math.log10(r.peak / 32768), 0) + " dBFS" : ""}</dd>
+<dt>Noise</dt><dd>${q ? "loud moments " + fx(q.snrDb, 0) + " dB above quiet ones" : "not measured"}</dd>
+</dl></div>${host && host.setPosition ? `<p class="how np">Tap a spot on the chest to set where this was recorded.</p>` : ""}</div></div><div class="col"><div class="card" style="order:2"><h3>Timing</h3><table>
+${row("Heart rate", rel ? fx(a.rate, 0) + " per minute" : nm, "60 divided by the median beat length. Usual adult resting range: 60 to 100 per minute.")}
+${row("Beat length, median", rel ? fx(a.cycle, 2) + " s" : nm, "Time from one first heart sound to the next. The median ignores a few odd beats.")}
+${row("Beat-length spread", rel ? "±" + fx(a.spread * 50, 0) + "%" : nm, "Half the range that holds the middle half of beats, as a share of the median. A few percent is common at rest, because breathing changes the rate. It is not a clinical heart-rate-variability measure.")}
+${row("S1 to S2 (systole)", rel ? fx(a.s1s2, 2) + " s" : nm, "From the first to the second heart sound. About 0.3 s at rest; shorter at higher rates. The marks sit on the loudest point of each sound, not its onset.")}
+${row("S2 to next S1 (diastole)", rel ? fx(a.cycle - a.s1s2, 2) + " s" : nm, "The filling gap. It shortens much more than systole when the rate rises.")}
+${row("Ratio systole : diastole", rel ? fx(a.s1s2 / (a.cycle - a.s1s2), 2) : nm, "Below 1 at resting rates. Near or above 1 at high rates, where the app may also swap S1 and S2: it assumes the shorter gap is systole.")}
+${row("Beats used", rel ? a.beats + " of " + nb : String(a.beats), "Beats with S1, S2 and the next S1 all found and a plausible length. Only these enter the numbers above.")}
+</table></div>
+<div class="card o3"><h3>Sound level in each gap</h3><table><tr><th></th><th class="n">40–200 Hz</th><th class="n">150–600 Hz</th></tr>
+<tr><td>Between S1 and S2</td><td class="n">${G.n ? sg(G.sysLo) + " dB" : nm}</td><td class="n">${G.n ? sg(G.sysHi) + " dB" : nm}</td></tr>
+<tr><td>Between S2 and next S1</td><td class="n">${G.n ? sg(G.diaLo) + " dB" : nm}</td><td class="n">${G.n ? sg(G.diaHi) + " dB" : nm}</td></tr></table>
+<p class="how">${a.sysDb != null ? "Flag measure: the S1–S2 gap is <b>" + sg(a.sysDb) + " dB</b> against the S2–S1 gap in the higher band (limit +" + fx(a.limitDb, 0) + " dB), above the limit in " + fx(a.sysShare * 100, 0) + "% of beats." : "The flag measure could not be taken."}</p>`
+    + how("0 dB would be as loud as that beat’s heart sounds; more negative is quieter. Median over " + G.n + " beats. One gap clearly louder than the other is what a murmur-like sound looks like here; equal levels are mostly background noise.") + `</div></div>
+</div><div class="full"><div class="card"><h3>Limits</h3><div class="box"><p>A phone microphone is not a stethoscope. The one phone tested cuts off below about 50 Hz, so the lowest part of the heart sounds and low-pitched extra sounds are weak or missing.</p><p>The murmur-like-sound flag was validated only on stethoscope recordings of children, not on phones or adults, and it looks only between S1 and S2.</p><p>Unusual-beat marks are not validated. Nothing here names or rules out a disease.</p></div></div></div></section>`;
+
+  // Level 3
+  h += `<section class="level" id="l3"><h2>3 · Data view</h2><p class="lead">For analysis: the signal in time and frequency, every beat, the method and exports.${rel ? "" : " Beats were not found reliably; per-beat data is shown for inspection only."}</p>`;
+  if (d.sgram) h += `<div class="full">` + card("c_sgram", "Spectrogram, 0–600 Hz", "Time left to right, pitch bottom to top; stronger colour is louder, over a 50 dB range. Heart sounds are the short vertical streaks near the bottom; ticks along the top mark each S1. A stripe that runs the whole width is steady noise or hum, not the heart.") + `</div>`;
+  h += `<div class="grid2">`;
+  if (d.spec) h += card("c_spec", "Average spectrum", "Level in each " + fx(d.spec.binHz, 1) + " Hz bin against a full-scale tone. Where the green line rises above the grey one, the sound comes and goes with the beats. The fall at the left edge is the microphone losing low pitches; it is the phone, not the heart.", `<div class="legend"><span><svg viewBox="0 0 18 10"><line class="ln" x1="1" y1="5" x2="17" y2="5"/></svg>whole recording</span><span><svg viewBox="0 0 18 10"><line class="mu" x1="1" y1="5" x2="17" y2="5"/></svg>quietest quarter (background)</span></div>`);
+  const lens = d.beats.len.filter(v => v > 0);
+  if (lens.length >= 3) h += card("c_hist", "Beat lengths", "How many beats had each length, in 0.02 s steps. One narrow pile is a steady rhythm. A second pile or a long tail means some beats were longer or shorter, or were missed by the beat finder.")
+    + card("c_poin", "Each beat against the next", "Each dot plots one beat’s length against the following one. A tight cluster on the diagonal is a steady rhythm; a stretch along it is slow change such as breathing; dots far from it are single odd beats or detection errors.", nOdd ? `<div class="legend"><span><svg viewBox="0 0 18 10"><circle class="dot" cx="9" cy="5" r="3.5"/></svg>pair of beats</span><span><svg viewBox="0 0 18 10"><path class="odd" d="M9 0l5 5l-5 5l-5-5z"/></svg>includes an unusual beat</span></div>` : "");
+  if (d.overlay && d.overlay.rows.length) h += card("c_over", "All beats lined up on S1", "One thin line per beat, loudness in the 40–200 Hz band (" + d.overlay.rows.length + (d.overlay.total > d.overlay.rows.length ? " of " + d.overlay.total : "") + " beats). Lines that stack tightly mean the beats repeat well. S2 looks smeared when the S1–S2 time varies. Stray lines are single beats that differ" + (d.overlay.odd.some(Boolean) ? "; amber ones were marked unusual." : "."));
+  h += `</div>`;
+  if (nb) {
+    const head = `<tr><th class="n">#</th><th class="n">time</th><th class="n">length</th><th class="n">S1–S2</th><th class="n">gap 1</th><th class="n">gap 2</th><th class="n">flag</th><th>note</th></tr>`, B = d.beats;
+    const tr = i => `<tr><td class="n">${i + 1}</td><td class="n">${fx(B.t[i], 2)}</td><td class="n">${B.len[i] > 0 ? fx(B.len[i], 2) : "–"}</td><td class="n">${fx(B.gap[i], 2)}</td><td class="n">${sg(B.sysHi[i])}</td><td class="n">${sg(B.diaHi[i])}</td><td class="n">${sg(B.flagDb[i])}</td><td>${B.odd[i] ? `<span class="warn">${ODD_S[B.odd[i]]}</span>` : B.ok[i] ? "" : "missing"}</td></tr>`;
+    let all = ""; for (let i = 0; i < nb; i++) all += tr(i);
+    const lim = Math.min(nb, 120), per = Math.ceil(lim / 3); let cols = "";
+    for (let c = 0; c < 3; c++) { let rs = ""; for (let i = c * per; i < Math.min(lim, (c + 1) * per); i++) rs += tr(i); if (rs) cols += `<table>${head}${rs}</table>`; }
+    h += `<div class="full"><figure class="card"><h3>Every beat</h3><div class="scroll so"><table>${head}${all}</table></div><div class="po">${cols}</div>`
+      + how("One row per beat: time of S1, length to the next S1 and S1–S2 time in seconds; level in each gap in dB (150–600 Hz, relative to that beat’s heart sounds); and the flag measure in dB (gap 1 against gap 2)." + (nb > 120 ? " The printed table shows the first 120 beats; the CSV has all " + nb + "." : "") + " Notes: timing = unusual length, knock = knock or loud noise, shape = unusual shape, missing = a heart sound was not found. A dash means not measured.") + `</figure></div>`;
+  }
+  h += `<div class="grid2"><div class="card"><h3>Method</h3><p class="how" style="margin:0;color:var(--fg)">Raw 16-bit recording, low-passed and reduced to ${fx(d.fs, 0)} Hz; the first 0.3 s is skipped. Loudness curves: 4th-order Butterworth band-pass 40–200 Hz and 150–600 Hz, rectified, smoothed at 20 Hz, 5 ms steps. Beat length from the autocorrelation of the 40–200 Hz curve; beats tracked from the strongest peak; the shorter gap is taken as S1–S2. Typical beat: median and quartiles over beats lined up on S1. Flag: median over beats of the 150–600 Hz level in the S1–S2 gap against the S2–S1 gap, at least +${fx(a.limitDb, 0)} dB. Spectrum: 512-point Hann frames, loudest 2% left out. Spectrogram: 256-point Hann frames every 16 ms.</p>
+<p class="how">Validation on CirCor DigiScope stethoscope recordings (children): beats found reliably in 90% of 1,749 recordings, rate within 5 per minute in 89% of those; on 829 held-out recordings the flag marked 59% of murmurs and 4% of recordings without one. Not validated on phones. Details: ${host ? "docs/validation.md in the project repository" : `<a href="https://github.com/jacekkotowski/apk-heart-sounds/blob/main/docs/validation.md">docs/validation.md</a>`}. Report format ${d.v}, app ${esc(d.app)}.</p></div>
+<div class="card np"><h3>Export</h3><div class="btns"><button id="x_pdf">Report as PDF</button>${host && host.sharePdf ? `<button id="x_share">Share PDF</button>` : ""}<button id="x_csv">Per-beat CSV</button><button id="x_json">Everything as JSON</button></div><p class="how">${host ? "CSV and JSON go to Download/HeartSounds. PDF opens Android’s print screen: choose “Save as PDF”." : "PDF opens the print dialog: choose “Save as PDF”."}</p></div></div></section>`;
+
+  // Primer
+  h += `<section class="level" id="primer"><h2>Heart sounds in two minutes</h2><p class="lead">A short guide to what the report is about.</p><div class="primer">
+<div class="card"><svg viewBox="0 0 92 70"><path class="body" d="M46 62C20 44 10 32 14 20q4-10 16-8q9 2 16 12q7-10 16-12q12-2 16 8q4 12-32 42z"/><path class="ln" d="M4 66h10l3-9l4 14l3-5h18l3-6l3 9l2-3h38" style="stroke-width:1.5"/><text x="18" y="54" class="lbl">S1</text><text x="43" y="57" class="lbl">S2</text></svg><p><b>What makes the two sounds.</b> A heartbeat is “lub-dub”. The first sound (S1) comes when the valves between the upper and lower chambers shut as the heart starts to squeeze. The second (S2) comes when the outlet valves shut as it relaxes.</p></div>
+<div class="card"><svg viewBox="0 0 92 70"><path class="ln" style="stroke-width:1.5" d="M4 36h8l2-16l3 30l3-22l2 8h4"/><path class="oddl" d="M26 36l2-4l2 7l2-6l2 5l2-6l2 7l2-5l2 4l2-5l2 6l2-4l2 3"/><path class="ln" style="stroke-width:1.5" d="M54 36l2-12l3 22l3-14l2 4h24"/><text x="8" y="64" class="lbl">S1</text><text x="38" y="14" text-anchor="middle">murmur</text><text x="56" y="64" class="lbl">S2</text></svg><p><b>What a murmur is.</b> A murmur is a whooshing sound of blood flowing, heard between the heart sounds. Many are harmless, especially in children and in fit or pregnant adults. Some come from a valve that is narrow or leaks. The sound alone does not say which; a doctor does.</p></div>
+<div class="card"><svg viewBox="0 0 92 70"><path class="ax" d="M10 6v50h78"/><path class="mu" d="M10 20h56q10 0 16 22"/><path class="ln" d="M12 56q8-34 22-36h34q9 0 14 22"/><text x="14" y="16">stethoscope</text><text x="40" y="34" class="lbl">phone</text><text x="88" y="67" text-anchor="end">low pitch → high</text></svg><p><b>Why a phone hears less.</b> Heart sounds are very low-pitched, mostly 20 to 150 Hz. A stethoscope is built for that range. A phone microphone is built for voices and fades out below about 50 to 100 Hz, so it catches only the upper part and adds more noise.</p></div>
+<div class="card">${chest("ll", false).replace("<svg ", '<svg style="width:92px" ')}<p><b>How to get a better recording.</b> Quiet room, sitting or lying still. Press the phone’s bottom edge on bare skin, just left of the breastbone between the ribs. Breathe gently or hold your breath for a few seconds. Do not rub or shift the phone. Use the same spot each time so recordings can be compared.</p></div>
+</div></section>`;
+  return h;
+}
+
+function mount(id, c) {
+  const el = $(id); if (!el || !c) return; el.innerHTML = c.html; if (!c.probe) return;
+  const s = el.querySelector("svg"), cross = s.querySelector(".cross"), tip = $("tip");
+  const hide = () => { cross.style.opacity = 0; tip.style.display = "none"; };
+  const mv = ev => {
+    const r = s.getBoundingClientRect(), vb = s.viewBox.baseVal, p = c.probe((ev.clientX - r.left) / r.width * vb.width, (ev.clientY - r.top) / r.height * vb.height);
+    if (!p) { hide(); return; }
+    cross.setAttribute("x1", p.x); cross.setAttribute("x2", p.x); cross.setAttribute("y1", p.y0); cross.setAttribute("y2", p.y1); cross.style.opacity = 0.6;
+    tip.textContent = ""; const hd = document.createElement("b"); hd.textContent = p.head; tip.append(hd); for (const t of p.rows) { const e = document.createElement("div"); e.textContent = t; tip.append(e); }
+    tip.style.display = "block"; const tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.max(4, Math.min(window.innerWidth - tw - 4, ev.clientX + 12)) + "px"; tip.style.top = Math.max(4, ev.clientY - th - 12) + "px";
+  };
+  s.addEventListener("pointermove", mv); s.addEventListener("pointerdown", mv); s.addEventListener("pointerleave", hide); s.addEventListener("pointercancel", hide);
+}
+function drawCharts() {
+  const d = D, rel = d.a.reliable;
+  if (rel && d.beat) mount("c_beat", beatSimple(d.beat));
+  if ($("c_over1")) mount("c_over1", rhythm({ seconds: d.seconds, over: d.over, beats: d.beats, a: { reliable: false }, marks: { s1: [] } }));
+  if (d.strip) mount("c_strip", strip(rel ? d : Object.assign({}, d, { marks: { s1: [], s2: [] } })));
+  mount("c_rhythm", rhythm(d));
+  if (d.beat) mount("c_bands", beatBands(d.beat));
+  if (d.sgram) mount("c_sgram", sgram(rel ? d : Object.assign({}, d, { marks: { s1: [], s2: [] } })));
+  if (d.spec) mount("c_spec", spectrum(d));
+  if ($("c_hist")) { mount("c_hist", histogram(d)); mount("c_poin", poincare(d)); }
+  if ($("c_over")) mount("c_over", overlay(d));
+  drawChest();
+}
+function drawChest() {
+  const pos = (D.rec || {}).pos || "", can = !!(host && host.setPosition), el = $("c_chest"); el.innerHTML = chest(pos, can);
+  $("posname").textContent = SPOTS[pos] ? SPOTS[pos][0] + " (" + SPOTS[pos][1] + ")" : "not recorded";
+  if (can) for (const c of el.querySelectorAll(".spot")) { const set = () => { D.rec.pos = c.dataset.pos; host.setPosition(D.rec.name, c.dataset.pos); drawChest(); }; c.addEventListener("click", set); c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") set(); }); }
+}
+function setWide() { const w = printing || window.innerWidth >= 700; if (w !== wide) { wide = w; if (D) drawCharts(); } }
+
+// ---------- exports ----------
+function csv() {
+  const B = D.beats, v = x => x == null ? "" : x, rows = ["beat,time_s,length_s,s1_s2_s,both_sounds_found,gap1_low_db,gap2_low_db,gap1_high_db,gap2_high_db,flag_measure_db,unusual"];
+  for (let i = 0; i < B.t.length; i++) rows.push([i + 1, B.t[i], B.len[i] > 0 ? B.len[i] : "", v(B.gap[i]), B.ok[i], v(B.sysLo[i]), v(B.diaLo[i]), v(B.sysHi[i]), v(B.diaHi[i]), v(B.flagDb[i]), ODD[B.odd[i]]].join(","));
+  return rows.join("\n") + "\n";
+}
+function save(suffix, mime, text) {
+  const file = String((D.rec || {}).name || "recording").replace(/\.wav$/, "") + suffix;
+  if (host && host.save) { host.save(file, mime, text); return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = file; document.body.append(a); a.click(); a.remove();
+}
+function pdf() { const job = String((D.rec || {}).name || "recording").replace(/\.wav$/, "") + "_report"; if (host && host.print) host.print(job); else window.print(); }
+
+function show(data) {
+  D = data; wide = window.innerWidth >= 700;
+  $("load").hidden = true; $("pick").hidden = true; const rep = $("rep"); rep.innerHTML = build(); rep.hidden = false; drawCharts();
+  document.title = "Heart sound report · " + String((D.rec || {}).name || "").replace(/\.wav$/, "");
+  $("x_pdf").addEventListener("click", pdf); $("x_csv").addEventListener("click", () => save("_beats.csv", "text/csv", csv())); $("x_json").addEventListener("click", () => save("_report.json", "application/json", JSON.stringify(D)));
+  if ($("x_share")) $("x_share").addEventListener("click", () => host.sharePdf(String(D.rec.name || "recording").replace(/\.wav$/, "") + "_report"));
+  window.__ready = true;
+}
+$("pdf").addEventListener("click", () => { if (D) pdf(); });
+$("back").addEventListener("click", () => { if (history.length > 1) history.back(); else location.href = "index.html"; });
+window.addEventListener("resize", setWide);
+window.addEventListener("beforeprint", () => { printing = true; setWide(); });
+window.addEventListener("afterprint", () => { printing = false; setWide(); });
+$("file").addEventListener("change", ev => { const f = ev.target.files[0]; if (!f) return; f.text().then(t => show(JSON.parse(t))).catch(() => say("That file is not a Heart Sounds report.")); });
+if (window.REPORT_DATA) show(window.REPORT_DATA);
+else if (host && location.hash.length > 1) {
+  const name = decodeURIComponent(location.hash.slice(1)); host.start(name);
+  const t = setInterval(() => {
+    const m = host.message ? host.message() : null; if (m) say(m);
+    const j = host.poll(); if (!j || j === "null") return;
+    clearInterval(t); const o = JSON.parse(j);
+    if (o.error) { $("load").textContent = "The report could not be made: " + o.error; return; }
+    show(o); setInterval(() => { const n = host.message ? host.message() : null; if (n) say(n); }, 400);
+  }, 150);
+} else { $("load").hidden = true; $("pick").hidden = false; $("pdf").hidden = true; if (!host) $("back").hidden = true; }
+</script></body></html>

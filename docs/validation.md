@@ -1,6 +1,6 @@
 # Validation
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
 
 ## What was tested
 
@@ -40,6 +40,21 @@ Held-out half, 829 recordings from 261 patients, every recording counted:
 Among recordings where the beats were found: 65% of murmurs flagged (139 of 214), 96% of non-murmurs not flagged (492 of 514). Of the flagged recordings, 86% had a murmur; in this test set 29% of recordings had one, far more than among people in general, so in ordinary use a much smaller share of flags will be real.
 
 By loudness grade, murmurs flagged: grade I 42% (of 80), grade II 66% (of 74), grade III 93% (of 60).
+
+## Re-run for 0.3.0 (2026-11-12)
+
+`Analysis.java` was changed for the report: it now also returns its loudness curves, per-beat values and the typical beat in the higher band, and one array was enlarged. The enlargement fixes a crash found in this re-run: recording 50655_AV stopped the old code with an array overflow when the beat length drifted to its lower limit.
+
+Old and new code were run on all 3,163 recordings of the dataset and the output rows compared.
+
+| Result | Recordings |
+|---|---|
+| Identical row (rate, timing, flag measure, flag) | 3,156 |
+| Old code crashed, new code answers "cannot tell" | 1 |
+| Different numbers, "cannot tell" before and after | 6 |
+| Flag or reliability changed | 0 |
+
+The six differ because the larger array lets beat tracking run to the end of the recording at very short beat lengths. The tables above therefore stand. The random patient subset and split of the first run were not stored, so those tables were not recomputed row by row.
 
 ## What this does not show
 

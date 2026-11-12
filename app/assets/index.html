@@ -41,6 +41,8 @@ input[type=text]{flex:1;min-width:0;min-height:40px;font:inherit;color:var(--fg)
 .danger{color:var(--rec)}
 .ana{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:4px;padding:8px;background:var(--panel)}.ana canvas{display:block;width:100%;height:120px;background:var(--bg);border-radius:4px}.ana .v{font-size:15px}.ana .flag{font-weight:600}.ana .tip{font-size:12px}
 #empty{color:var(--dim);padding:14px 0}
+#posrow{display:flex;gap:10px;align-items:center}#chest{flex:none;width:76px}#chest svg{display:block;width:100%}
+.body{stroke:var(--dim);stroke-width:1.5;fill:none;stroke-linejoin:round;stroke-linecap:round}.spot{fill:var(--panel);stroke:var(--dim);stroke-width:1.5}.spot.sel{fill:var(--play);stroke:var(--play)}
 #note{padding:0 16px 10px;color:var(--dim);font-size:12px}
 [hidden]{display:none!important}
 </style></head><body>
@@ -64,7 +66,7 @@ input[type=text]{flex:1;min-width:0;min-height:40px;font:inherit;color:var(--fg)
       <label for="mic">Microphone<select id="mic"></select></label>
       <div class="tip">After REC you have 3 seconds to get in position; a buzz marks the start and a double buzz the end. Phone speakers can't play sounds this low, so use headphones. Filter, noise reduction and hum filter apply to the graph, playback and filtered exports. The saved recording is always the raw microphone signal.</div>
     </div>
-    <div class="tip" id="how">Press the phone's bottom edge (microphone) onto bare skin just left of the breastbone, between the ribs. Hold still. Listen with headphones.</div>
+    <div id="posrow"><div id="chest"></div><div class="tip" id="how">Press the phone's bottom edge (microphone) onto bare skin just left of the breastbone, between the ribs. Hold still. Listen with headphones.<br><span id="posname"></span></div></div>
   </div>
   <div id="msg" role="status"></div>
   <div id="bar"><span id="count"></span></div>
@@ -101,6 +103,16 @@ $("dur").value = "30"; $("nr").value = "0.2";
 const sel = id => { const el = $(id), s = get(id, null); if (s !== null) { el.value = s; if (el.value !== s) el.selectedIndex = 0; } el.addEventListener("change", () => { put(id, el.value); sendCfg(); }); };
 ["dur", "nr", "hum", "src", "mic", "shift"].forEach(sel);
 $("adv").addEventListener("click", () => { $("advp").hidden = !$("advp").hidden; });
+// Chest position of the next recording: four tap targets on a small chest, seen from the front. Stored next to the recording for the report.
+const SPOTS = { ur: ["upper right of the breastbone", 47, 50], ul: ["upper left of the breastbone", 73, 50], ll: ["lower left of the breastbone", 71, 80], apex: ["lower left chest, below the nipple", 90, 93] };
+let pos = get("pos", ""); if (!SPOTS[pos]) pos = "";
+function drawChest() {
+  let g = '<path class="body" d="M50 4v9q0 8-13 11l-15 4q-12 4-12 18v80M70 4v9q0 8 13 11l15 4q12 4 12 18v80"/><path class="body" style="stroke-width:1" d="M60 32v64M36 36q12 5 24 1q12 4 24-1M34 100q13 9 26-2q13 11 26 2"/>';
+  for (const k in SPOTS) g += '<circle class="spot' + (pos === k ? " sel" : "") + '" data-pos="' + k + '" cx="' + SPOTS[k][1] + '" cy="' + SPOTS[k][2] + '" r="9" role="button" tabindex="0" aria-label="' + SPOTS[k][0] + '"/>';
+  $("chest").innerHTML = '<svg viewBox="0 0 120 132" role="group" aria-label="Chest position, seen from the front">' + g + "</svg>";
+  $("posname").textContent = pos ? "Position for the report: " + SPOTS[pos][0] + ". Tap it again to clear." : "Tap the chest to note where you record.";
+  for (const c of $("chest").querySelectorAll(".spot")) c.addEventListener("click", () => { if (was.rec) return; pos = pos === c.dataset.pos ? "" : c.dataset.pos; put("pos", pos); drawChest(); if (A) A.nextPos(pos); });
+}
 
 // Graph: the last 6 seconds, one point per 10 ms, scaled to the recent signal so weak heart sounds are visible.
 // Smooth trace is the loudness curve on an ECG-paper-style grid (0.2 s small squares, 1 s bold lines). It is sound, not an ECG.
@@ -155,6 +167,7 @@ function row(r, st) {
   const playing = st.play === r.name;
   a.append(btn(playing ? "STOP" : "PLAY", () => { playing ? A.stopPlay() : A.play(r.name); }, "pl"));
   a.append(btn(anaWait === r.name ? "ANALYSING…" : "ANALYSE", () => { if (ana[r.name]) { delete ana[r.name]; render(); } else if (!anaWait) { anaWait = r.name; A.analyse(r.name); render(); } }));
+  a.append(btn("REPORT", () => { if (A) A.stopPlay(); location.href = "report.html#" + encodeURIComponent(r.name); }));
   a.append(btn("MORE", () => { open = open === r.name ? null : r.name; confirmDel = null; renaming = null; render(); }));
   d.append(a);
   if (playing) {
@@ -263,7 +276,7 @@ function tick() {
   const pt = $("pt"); if (pt) pt.textContent = fmt(s.pos) + " / " + fmt(s.dur);
 }
 $("recb").addEventListener("click", () => { say(""); if (was.rec) A.stopRec(); else { sendCfg(); A.startRec(); } });
-sendCfg(); setView(); draw();
+sendCfg(); setView(); draw(); drawChest(); if (A) A.nextPos(pos);
 if (A) { refresh(); setInterval(tick, 100); tick(); } else say("Open this inside the app.");
 window.addEventListener("resize", draw);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && A) { refresh(); fillMics(); sendCfg(); } });

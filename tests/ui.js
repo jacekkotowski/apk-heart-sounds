@@ -36,12 +36,13 @@ const STUB = `window.__c=[];window.__t=0;window.Android=new Proxy({},{get:(t,k)=
   const anaText = await pg.textContent('.ana');
   await pg.click('button:text-is("ANALYSE")'); await pg.evaluate('window.__flag=true'); await pg.click('button:text-is("ANALYSE")'); await pg.waitForTimeout(500); await pg.screenshot({ path: shot('ui_flag.png') });
   const flagText = await pg.textContent('.ana');
+  await pg.click('#chest .spot[data-pos=apex]'); const posText = await pg.textContent('#posname'), hasReport = await pg.isVisible('button:text-is("REPORT")');
   const seek = 1, calls = await pg.evaluate('__c');
   const cfg = calls.filter(c => c.startsWith('config')).pop(), keep = calls.filter(c => c.startsWith('keepOn')).join(' ');
   const fits = await pg.evaluate('document.documentElement.scrollWidth<=window.innerWidth');
   const ok = !errs.length && cfg === 'config:9,0,20,600,50,0.1,30,250' && calls.includes('startRec:') && count === '-2' && clock === '00:12 / 00:30' && q.includes('good') && dis
     && ink > 2000 && view0 === 'true' && anaText.includes('Heart rate: 81 per minute') && anaText.includes('Not flagged') && anaText.includes('Unusual beats (amber): 2 of 8') && anaText.includes('00:03 timing') && anaText.includes('cannot name or rule out') && flagText.includes('Flagged: extra sound') && flagText.includes('Only a doctor') && keep === 'keepOn:true keepOn:false' && fits
-    && calls.includes('saveFiltered:2026-11-11_16-10-00.wav') && calls.includes('saveCsv:2026-11-11_16-10-00.wav');
-  console.log('config', cfg, '| countdown', count, '| clock', clock, '|', q, '| controls locked', dis, '| waveform pixels', ink, '| analysis shown', anaText.includes('Heart rate: 81'), '| flag shown', flagText.includes('Flagged'), '|', keep, '| fits width', fits, '| errors', errs);
+    && calls.includes('nextPos:apex') && posText.includes('below the nipple') && hasReport && calls.includes('saveFiltered:2026-11-11_16-10-00.wav') && calls.includes('saveCsv:2026-11-11_16-10-00.wav');
+  console.log('config', cfg, '| countdown', count, '| clock', clock, '|', q, '| controls locked', dis, '| waveform pixels', ink, '| analysis shown', anaText.includes('Heart rate: 81'), '| flag shown', flagText.includes('Flagged'), '|', keep, '| fits width', fits, '| chest position', calls.includes('nextPos:apex'), '| report button', hasReport, '| errors', errs);
   console.log(ok ? 'UI PASS' : 'UI FAIL'); await b.close(); process.exit(ok ? 0 : 1);
 })();

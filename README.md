@@ -4,7 +4,7 @@ Offline Android recorder for heart sounds picked up by the phone's own microphon
 
 Experimental. Not a medical device and not an ECG: the graph shows sound loudness, not the heart's electrical activity. It cannot diagnose or rule out heart disease.
 
-Current version: 0.2.1. Roadmap and test status in [PLAN.md](PLAN.md), background in [docs/research.md](docs/research.md), test results for the analysis in [docs/validation.md](docs/validation.md).
+Current version: 0.3.0. Roadmap and test status in [PLAN.md](PLAN.md), background in [docs/research.md](docs/research.md), test results for the analysis in [docs/validation.md](docs/validation.md).
 
 ## What it does
 
@@ -15,6 +15,8 @@ Current version: 0.2.1. Roadmap and test status in [PLAN.md](PLAN.md), backgroun
 - Graph of the last 6 seconds: smooth trace on an ECG-paper-style grid, or waveform.
 - Play, seek, rename, delete, share. Save raw WAV, filtered WAV, and graph CSV (time, filtered signal, smooth trace) to Download/HeartSounds.
 - ANALYSE on a recording: finds the beats and shows a typical beat (all beats lined up and averaged), heart rate, the gap between the two heart sounds, a beat-by-beat strip with unusual beats marked, and an experimental flag for a murmur-like sound between the two heart sounds. When beats are not found reliably it says so and gives no number.
+- REPORT on a recording: one scrolling page in three levels (at a glance, clinical view, data view) with a short primer, drawn from the same analysis. It shows the typical beat, a sound trace of the cleanest 10 seconds, the rhythm, timing and gap levels, spectrogram, spectrum, every beat in a table, and what the numbers do and do not mean. Print or save it as an A4 PDF, share the PDF, save the per-beat CSV and the full JSON to Download/HeartSounds. A recording without reliable beats still gets a report that says so.
+- Chest position: tap one of four spots on a small chest before recording, or in the report afterwards. It is stored in a small `.json` file next to the recording, together with the date, sample rate, audio source and microphone.
 - Playback pitch: true, or raised by 250 Hz so the beats can be heard on the phone speaker. Exports always keep the true pitch.
 - No internet permission.
 
@@ -41,10 +43,12 @@ bash build.sh        # writes HeartSounds.apk and prints its SHA-256
 
 - `bash tests/run.sh`: filter frequency response, alias rejection, noise reduction on synthetic beats, level setting, WAV and CSV files. Needs only a JDK.
 - `node tests/ui.js [folder]`: loads the screen in a headless browser with a stand-in for the Android side and saves screenshots. Needs Playwright for Node.
+- `node tests/report.js [folder] [report.json ...]`: renders the report from the synthetic JSON that `tests/run.sh` writes, at phone width and as an A4 PDF; fails on script errors, sideways overflow, a missing caveat, a disease name, or more than 4 pages. To render a real recording: `java -cp out/test pl.heartsounds.MakeReport recording.wav r.json`, then pass `r.json` as an extra argument. Do not commit either file.
 
 ## Known limits
 
-- Version 0.1 recorded real heart sounds on the owner's phone. Everything added in 0.2 has not been run on a phone. See PLAN.md.
+- Version 0.1 recorded real heart sounds on the owner's phone. Everything added in 0.2 and 0.3 has not been run on a phone. See PLAN.md.
+- The report was rendered from synthetic beats and from stethoscope recordings, not yet from a phone recording. Printing, Share PDF and saving from the report use Android services that were not run here. Share PDF relies on a part of Android that some phones may refuse; it then opens the print screen instead.
 - Many phone microphones roll off below about 100 Hz, and some phones process the sound even on the unprocessed source. Whether the 20–200 Hz band is usable depends on the phone.
 - Android does not always say which microphone is in use; the bottom one is requested only when the phone names it.
 - Phone speakers can't reproduce these frequencies. Use headphones.
@@ -63,7 +67,9 @@ bash build.sh        # writes HeartSounds.apk and prints its SHA-256
 6. Record with the screen switched off after pressing REC.
 7. ANALYSE: typical beat with S1 and S2, a heart rate, and the flag line. Compare the rate with a pulse count.
 8. AUDIO > Playback pitch > Raised 250 Hz, then PLAY on the phone speaker.
-9. Flight mode: everything still works.
+9. Tap a spot on the small chest, record, then REPORT: the page opens within 3 seconds for 60 s, shows the position, and the Back button and Android's back gesture return to the recordings.
+10. In the report: Report as PDF (print screen, Save as PDF, at most 4 pages with margins), Share PDF, Per-beat CSV and Everything as JSON (both appear in Download/HeartSounds).
+11. Flight mode: everything still works.
 
 ## Licences
 

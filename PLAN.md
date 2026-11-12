@@ -19,6 +19,9 @@ Last updated: 2026-11-12
 | Murmur-like-sound flag | Tested on stethoscope recordings of children only: 59% of murmurs flagged, 4% false flags. Not tested on phones or adults |
 | Unusual-beat marks | Built, not validated |
 | Raised-pitch playback | Tested on a computer, not heard on a phone |
+| Report page: three levels, primer, PDF layout, CSV and JSON | Tested in a headless browser on synthetic beats and four stethoscope recordings: no script errors, fits a phone, PDF 4 pages. Not rendered from a phone recording, not run on a phone |
+| REPORT button, print, Share PDF, saves from the report, back navigation | Built, not run on a phone |
+| Chest position and recording details stored next to the recording | Built, not run on a phone |
 | Smaller files (see below) | Not started |
 | Naming any disease | Not built and not planned: no data supports it |
 
@@ -42,9 +45,13 @@ The beats in these tests are synthetic bursts, not real heart sounds.
 
 Run the checklist in README.md, and count the pulse during one recording to check the heart rate.
 
-## Next step 2: report
+## Next step 2: report (built in 0.3.0, phone test open)
 
-A readable, teaching report per recording for user, doctor and data scientist. Full plan in [docs/report-plan.md](docs/report-plan.md).
+Built as planned in [docs/report-plan.md](docs/report-plan.md). Still open from its "Done when" list:
+
+- Render all three levels from the owner's phone recording. No recording was available; `tests/MakeReport.java` plus `tests/report.js` do it in one step once a WAV is uploaded.
+- Time the report on the phone (60 s took 0.15 s to compute and 0.2 s to draw on a computer).
+- Check the printed PDF from Android: page count, margins, and whether Share PDF works on the phone.
 
 ## Next step 3: phone validation of the flag
 

@@ -54,10 +54,10 @@ public class RecService extends Service {
         } catch (Exception e) { error = "Can't record in the background: " + e.getMessage(); stopSelf(); return START_NOT_STICKY; }
         final int source = in.getIntExtra("source", MediaRecorder.AudioSource.UNPROCESSED), device = in.getIntExtra("device", 0), dur = in.getIntExtra("dur", 30), delay = in.getIntExtra("delay", 3);
         final Cfg cfg = new Cfg(in.getDoubleExtra("lo", 20), in.getDoubleExtra("hi", 200), in.getDoubleExtra("hum", 0), in.getDoubleExtra("floor", 0.2));
-        final String path = in.getStringExtra("path");
+        final String path = in.getStringExtra("path"), pos = in.getStringExtra("pos");
         file = path; error = null; running = true; samples = 0; level = 0; clipped = false; quality = ""; info = "";
         limitSec = dur <= 0 ? MAX_SECONDS : Math.min(dur, MAX_SECONDS); countdown = delay;
-        new Thread(() -> loop(path, source, device, delay, cfg), "rec").start();
+        new Thread(() -> loop(path, source, device, delay, cfg, pos), "rec").start();
         return START_NOT_STICKY;
     }
 
@@ -80,8 +80,8 @@ public class RecService extends Service {
         } catch (Exception ignored) {}
     }
 
-    private void loop(String path, int source, int device, int delay, Cfg cfg) {
-        AudioRecord rec = null; OutputStream out = null; File f = new File(path); int r = 0;
+    private void loop(String path, int source, int device, int delay, Cfg cfg, String pos) {
+        AudioRecord rec = null; OutputStream out = null; File f = new File(path); int r = 0; String mSource = "", mMic = "", mFx = "";
         try {
             // Unprocessed first, then sources that Android also leaves mostly untouched. 48 kHz first, 44.1 kHz as fallback.
             int[] sources = {source, MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.MIC}; int used = -1;
@@ -113,6 +113,7 @@ public class RecService extends Service {
             try { for (MicrophoneInfo m : rec.getActiveMicrophones()) { String ad = m.getAddress(); mics.append(mics.length() > 0 ? "+" : "").append(ad == null || ad.isEmpty() ? m.getDescription() : ad); } } catch (Exception ignored) {}
             AudioDeviceInfo rd = rec.getRoutedDevice();
             info = (r / 1000.0) + " kHz · " + sourceName(used) + (used != source ? " (fallback)" : "") + (mics.length() > 0 ? " · mic " + mics : rd != null ? " · " + MainActivity.micName(rd) : "") + fx;
+            mSource = sourceName(used) + (used != source ? " (fallback)" : ""); mMic = mics.length() > 0 ? mics.toString() : rd != null ? String.valueOf(MainActivity.micName(rd)) : ""; mFx = fx.toString().trim();
             Log.i("HeartSounds", "recording: " + info + ", requested source " + sourceName(source) + ", preferred device " + (want == null ? "none" : MainActivity.micName(want)));
 
             HeartChain chain = new HeartChain(r, cfg); Quality q = new Quality(chain.fs); Envelope env = new Envelope(chain.fs);
@@ -150,7 +151,12 @@ public class RecService extends Service {
         } finally {
             if (rec != null) { try { rec.stop(); } catch (Exception ignored) {} rec.release(); }
             try { if (out != null) { out.close(); Wav.finish(f, r); } } catch (Exception e) { error = "Can't finish the file: " + e.getMessage(); }
-            if (samples == 0) f.delete(); else buzz(0, 120, 120, 120);
+            if (samples == 0) f.delete(); else {
+                buzz(0, 120, 120, 120);
+                // What is known about this recording goes in a small file next to it, for the report.
+                MainActivity.putMeta(f, "date", new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.ROOT).format(new java.util.Date(f.lastModified() - samples * 1000L / Math.max(r, 1))),
+                        "rate", String.valueOf(r), "source", mSource, "mic", mMic, "fx", mFx, "pos", pos == null ? "" : pos);
+            }
             running = false; level = 0; countdown = 0;
             stopForeground(STOP_FOREGROUND_REMOVE); stopSelf();
         }

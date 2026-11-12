@@ -17,6 +17,9 @@ import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.provider.MediaStore;
 import android.view.View;
 import android.view.WindowInsets;
@@ -46,7 +49,8 @@ public class MainActivity extends Activity {
     private volatile boolean playStop, busy;
     private volatile String playName, notice;
     private volatile double playPos, playDur, seekTo = -1;
-    private volatile String analysis;
+    private volatile String analysis, report, nextPos = "";
+    private static final String POSITIONS = " ur ul ll apex ";
 
     static String micName(AudioDeviceInfo d) {
         int t = d.getType(); String kind;
@@ -61,6 +65,19 @@ public class MainActivity extends Activity {
     static File dir(Context c) { File d = new File(c.getExternalFilesDir(null), "recordings"); d.mkdirs(); return d; }
     private static String jq(String s) { return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""; }
     private File named(String name) { return new File(dir(this), new File(name).getName()); }
+    static File reportDir(Context c) { File d = new File(c.getCacheDir(), "report"); d.mkdirs(); return d; }
+
+    /** Small JSON file next to a recording: date, sample rate, audio source, microphone, chest position. */
+    static File side(File wav) { return new File(wav.getPath() + ".json"); }
+    static org.json.JSONObject meta(File wav) {
+        try { byte[] b = java.nio.file.Files.readAllBytes(side(wav).toPath()); return new org.json.JSONObject(new String(b, "UTF-8")); } catch (Exception e) { return new org.json.JSONObject(); }
+    }
+    static synchronized void putMeta(File wav, String... kv) {
+        try {
+            org.json.JSONObject o = meta(wav); for (int i = 0; i + 1 < kv.length; i += 2) o.put(kv[i], kv[i + 1]);
+            java.nio.file.Files.write(side(wav).toPath(), o.toString().getBytes("UTF-8"));
+        } catch (Exception ignored) {}
+    }
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -72,6 +89,7 @@ public class MainActivity extends Activity {
         web.getSettings().setDomStorageEnabled(true);
         web.getSettings().setBlockNetworkLoads(true);
         web.addJavascriptInterface(new Bridge(), "Android");
+        web.addJavascriptInterface(new ReportHost(), "ReportHost");
         // A WebView ignores its own padding, so the system-bar insets go on a parent layout.
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(BG);
@@ -92,7 +110,7 @@ public class MainActivity extends Activity {
         String stamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT).format(new Date());
         Cfg c = cfg;
         Intent i = new Intent(this, RecService.class).putExtra("source", source).putExtra("device", device).putExtra("dur", durSec).putExtra("delay", 3)
-                .putExtra("lo", c.lo).putExtra("hi", c.hi).putExtra("hum", c.hum).putExtra("floor", c.floor).putExtra("path", new File(dir(this), stamp + ".wav").getPath());
+                .putExtra("pos", nextPos).putExtra("lo", c.lo).putExtra("hi", c.hi).putExtra("hum", c.hum).putExtra("floor", c.floor).putExtra("path", new File(dir(this), stamp + ".wav").getPath());
         try { startForegroundService(i); } catch (Exception e) { notice = "Can't start recording: " + e.getMessage(); }
     }
 
@@ -203,7 +221,7 @@ public class MainActivity extends Activity {
                 if (RecService.running && f.getPath().equals(RecService.file)) continue;
                 int rate = Wav.rate(f); if (rate < 0) continue;
                 if (s.length() > 1) s.append(',');
-                s.append("{\"name\":").append(jq(f.getName())).append(",\"rate\":").append(rate).append(",\"secs\":").append(Wav.samples(f) / (double) rate)
+                s.append("{\"name\":").append(jq(f.getName())).append(",\"pos\":").append(jq(meta(f).optString("pos"))).append(",\"rate\":").append(rate).append(",\"secs\":").append(Wav.samples(f) / (double) rate)
                         .append(",\"bytes\":").append(f.length()).append('}');
             }
             return s.append(']').toString();
@@ -239,13 +257,16 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void play(String name) { runOnUiThread(() -> MainActivity.this.play(name)); }
         @JavascriptInterface public void stopPlay() { runOnUiThread(MainActivity.this::stopPlayback); }
         @JavascriptInterface public void seek(double fraction) { seekTo = Math.max(0, Math.min(0.999, fraction)); }
-        @JavascriptInterface public void remove(String name) { if (name.equals(playName)) stopPlay(); named(name).delete(); }
+        @JavascriptInterface public void remove(String name) { if (name.equals(playName)) stopPlay(); named(name).delete(); side(named(name)).delete(); }
+        /** Chest position for the next recording: ur, ul, ll, apex or empty. */
+        @JavascriptInterface public void nextPos(String pos) { nextPos = POSITIONS.contains(" " + pos + " ") ? pos : ""; }
         @JavascriptInterface public boolean rename(String name, String to) {
             String clean = to.trim().replaceAll("[^\\p{L}\\p{N} _.-]", "_");
             if (clean.isEmpty()) return false;
             if (!clean.endsWith(".wav")) clean += ".wav";
             File dst = named(clean);
-            return !dst.exists() && named(name).renameTo(dst);
+            if (dst.exists() || !named(name).renameTo(dst)) return false;
+            side(named(name)).renameTo(side(dst)); return true;
         }
         @JavascriptInterface public void share(String name) {
             runOnUiThread(() -> {
@@ -281,6 +302,57 @@ public class MainActivity extends Activity {
             export(name.replaceAll("\\.wav$", "") + "_" + c.tag() + ".csv", "text/csv", tmp -> Render.csv(named(name), tmp, c));
         }
     }
+
+    /** The report page's side of the app: data, saving, printing and the chest position. The page also works without it. */
+    class ReportHost {
+        @JavascriptInterface public void start(String name) {
+            report = null;
+            new Thread(() -> {
+                try {
+                    File f = named(name); int[] fs = {0}; long[] st = {0, 0};
+                    float[] x = Render.signal(f, new Cfg(0, 0, 0, 1), fs, st); // unfiltered, reduced to about 4 kHz
+                    org.json.JSONObject m = meta(f), rec = new org.json.JSONObject();
+                    String date = m.optString("date");
+                    if (date.isEmpty()) { java.util.regex.Matcher q = java.util.regex.Pattern.compile("^(\\d{4}-\\d{2}-\\d{2})_(\\d{2})-(\\d{2})-\\d{2}").matcher(f.getName()); date = q.find() ? q.group(1) + " " + q.group(2) + ":" + q.group(3) : new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.ROOT).format(new Date(f.lastModified())); }
+                    rec.put("name", f.getName()).put("date", date).put("rate", Wav.rate(f)).put("source", m.optString("source")).put("mic", m.optString("mic")).put("fx", m.optString("fx")).put("pos", m.optString("pos")).put("peak", st[0]).put("clipped", st[1]);
+                    String ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+                    report = Report.json(x, fs[0], Analysis.run(x, fs[0]), rec.toString(), ver);
+                } catch (Throwable e) { report = "{\"error\":" + jq(String.valueOf(e.getMessage())) + "}"; }
+            }, "report").start();
+        }
+        @JavascriptInterface public String poll() { String r = report; if (r != null) report = null; return r == null ? "null" : r; }
+        @JavascriptInterface public String message() { String n = notice; notice = null; return n == null ? "" : n; }
+        @JavascriptInterface public void setPosition(String name, String pos) { if (POSITIONS.contains(" " + pos + " ")) putMeta(named(name), "pos", pos); }
+        @JavascriptInterface public void save(String file, String mime, String text) {
+            final String clean = new File(file).getName().replaceAll("[^\\p{L}\\p{N} _.-]", "_");
+            export(clean, mime, tmp -> java.nio.file.Files.write(tmp.toPath(), text.getBytes("UTF-8")));
+        }
+        /** Android's print screen, where "Save as PDF" is one of the printers. */
+        @JavascriptInterface public void print(String job) {
+            runOnUiThread(() -> {
+                try { getSystemService(PrintManager.class).print(job, web.createPrintDocumentAdapter(job), a4()); }
+                catch (Exception e) { notice = "Can't print: " + e.getMessage(); }
+            });
+        }
+        /** Makes the PDF without the print screen and opens the share sheet. Falls back to the print screen when the phone does not allow it. */
+        @JavascriptInterface public void sharePdf(String job) {
+            runOnUiThread(() -> {
+                try {
+                    final String file = new File(job).getName().replaceAll("[^\\p{L}\\p{N} _.-]", "_") + ".pdf"; final File out = new File(reportDir(MainActivity.this), file);
+                    android.print.PdfWriter.write(web.createPrintDocumentAdapter(job), a4(), out, err -> runOnUiThread(() -> {
+                        if (err != null || out.length() == 0) { notice = "Can't make the PDF here" + (err != null ? " (" + err + ")" : "") + ". Use Report as PDF and choose Save as PDF."; return; }
+                        Uri u = new Uri.Builder().scheme("content").authority("pl.heartsounds.files").appendPath("report").appendPath(file).build();
+                        startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("application/pdf").putExtra(Intent.EXTRA_STREAM, u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Share report"));
+                    }));
+                } catch (Throwable e) { notice = "Sharing a PDF directly is not possible on this phone. Choose Save as PDF on the print screen."; print(job); }
+            });
+        }
+    }
+    private static PrintAttributes a4() {
+        return new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).setResolution(new PrintAttributes.Resolution("pdf", "pdf", 300, 300)).setMinMargins(PrintAttributes.Margins.NO_MARGINS).build();
+    }
+
+    @Override public void onBackPressed() { if (web != null && web.canGoBack()) web.goBack(); else super.onBackPressed(); }
 
     @Override protected void onDestroy() { stopPlayback(); web.destroy(); super.onDestroy(); }
 }

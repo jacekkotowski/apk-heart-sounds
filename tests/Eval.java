@@ -24,7 +24,8 @@ public class Eval {
         System.out.println("file,reliable,rate,trueRate,s1s2,trueS1s2,segHit,beats,found,spread,strength,sysDb,sysShare,diaDb,flag");
         for (File f : fs) {
             int[] r = {0}; float[] x = wav(f, r);
-            Analysis an = Analysis.run(x, r[0]);
+            Analysis an;
+            try { an = Analysis.run(x, r[0]); } catch (RuntimeException e) { System.out.println(f.getName().replace(".wav", "") + ",CRASH " + e); continue; }
             File tsv = new File(f.getPath().replace(".wav", ".tsv")); double trueRate = 0, trueGap = 0, hit = -1;
             if (tsv.exists()) {
                 List<String> ls = Files.readAllLines(tsv.toPath()); java.util.ArrayList<double[]> s1 = new java.util.ArrayList<>(), s2 = new java.util.ArrayList<>(); double lo = 1e9, hi = 0;

@@ -25,11 +25,14 @@ final class Render {
     }
 
     /** Filtered signal in microphone units (16-bit scale), with no level change. fsOut[0] receives its sample rate. */
-    static float[] signal(File raw, Cfg c, int[] fsOut) throws IOException {
+    static float[] signal(File raw, Cfg c, int[] fsOut) throws IOException { return signal(raw, c, fsOut, null); }
+    /** As above. stats, when given, receives the highest raw sample size and the number of raw samples at full scale. */
+    static float[] signal(File raw, Cfg c, int[] fsOut, long[] stats) throws IOException {
         int rate = Wav.rate(raw); if (rate < 0) throw new IOException("this is not a recording from this app");
         HeartChain ch = new HeartChain(rate, c); fsOut[0] = (int) Math.round(ch.fs);
-        float[] out = new float[(int) (Wav.samples(raw) / ch.D) + 1]; int[] n = {0};
-        read(raw, v -> { if (ch.put(v) && n[0] < out.length) out[n[0]++] = (float) ch.out; });
+        float[] out = new float[(int) (Wav.samples(raw) / ch.D) + 1]; int[] n = {0}; long[] st = {0, 0};
+        read(raw, v -> { int m = Math.abs((int) v); if (m > st[0]) st[0] = m; if (m >= 32767) st[1]++; if (ch.put(v) && n[0] < out.length) out[n[0]++] = (float) ch.out; });
+        if (stats != null) { stats[0] = st[0]; stats[1] = st[1]; }
         return java.util.Arrays.copyOf(out, n[0]);
     }
 

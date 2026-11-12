@@ -1,6 +1,6 @@
 # Heart Sounds plan
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
 
 ## Status
 
@@ -42,11 +42,15 @@ The beats in these tests are synthetic bursts, not real heart sounds.
 
 Run the checklist in README.md, and count the pulse during one recording to check the heart rate.
 
-## Next step 2: phone validation of the flag
+## Next step 2: report
+
+A readable, teaching report per recording for user, doctor and data scientist. Full plan in [docs/report-plan.md](docs/report-plan.md).
+
+## Next step 3: phone validation of the flag
 
 See the last section of docs/validation.md. Until then the flag stays labelled experimental.
 
-## Next step 3: smaller files
+## Next step 4: smaller files
 
 Raw recordings are 5.8 MB per minute. No standard codec for heart sounds exists; published methods are research only (docs/research.md). Options, in order of effort:
 
